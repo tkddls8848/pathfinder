@@ -1,0 +1,14 @@
+<!--
+  알림 아이콘은 단색 실루엣이어야 한다 (시스템이 틴트를 입힌다).
+  방향 표시 화살표 하나로 단순하게 둔다.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z" />
+</vector>

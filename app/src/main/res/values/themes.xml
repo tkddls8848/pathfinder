@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      Compose 가 실제 테마를 그리므로 여기서는 첫 프레임 배경만 맞춘다.
+      기본 배경을 흰색으로 두어 앱 시작 시 검은 화면이 번쩍이지 않게 한다.
+    -->
+    <style name="Theme.Eodiga" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/surface</item>
+        <item name="android:statusBarColor">@color/surface</item>
+        <item name="android:navigationBarColor">@color/surface</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+    </style>
+</resources>
