@@ -19,7 +19,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +28,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kr.eodiga.wayfinder.service.VoiceGuide
 import kr.eodiga.wayfinder.ui.theme.EodigaColors
 import kr.eodiga.wayfinder.ui.theme.EodigaDimens
 
@@ -214,7 +214,11 @@ fun BusNumberTag(
         modifier = modifier
             .background(color, RoundedCornerShape(12.dp))
             .padding(horizontal = 24.dp, vertical = 10.dp)
-            .semantics { contentDescription = "${routeNo}번 버스" },
+            // 화면에는 "7016", 톡백에는 "칠 공 일 육 번 버스". 그냥 두면 "칠천십육" 으로
+            // 읽혀 전광판과 대조가 안 된다 — 이 태그가 존재하는 이유가 대조다.
+            .semantics {
+                contentDescription = "${VoiceGuide.busNumberToSpeech(routeNo)}번 버스"
+            },
     ) {
         Text(
             routeNo,

@@ -54,7 +54,6 @@ class TransitRepository @Inject constructor(
                     BusStop(
                         cityCode = city,
                         nodeId = id,
-                        nodeNo = dto.nodeNo,
                         name = dto.nodeName.orEmpty(),
                         location = LatLng(lat, lng),
                     )
@@ -77,8 +76,6 @@ class TransitRepository @Inject constructor(
                         routeId = id,
                         routeNo = dto.routeNo.orEmpty(),
                         kind = BusKind.from(dto.routeType),
-                        startStopName = dto.startNodeName,
-                        endStopName = dto.endNodeName,
                     )
                 }
         }
@@ -96,7 +93,6 @@ class TransitRepository @Inject constructor(
                     RouteStop(
                         order = dto.nodeOrder ?: return@mapNotNull null,
                         nodeId = dto.nodeId ?: return@mapNotNull null,
-                        nodeNo = dto.nodeNo,
                         name = dto.nodeName.orEmpty(),
                         location = LatLng(dto.lat ?: 0.0, dto.lng ?: 0.0),
                     )
@@ -105,16 +101,6 @@ class TransitRepository @Inject constructor(
         }
         routeStopCache[route.routeId] = stops
         stops
-    }
-
-    /** 정류소의 모든 도착 예정 정보. */
-    suspend fun arrivals(stop: BusStop): Outcome<List<BusArrival>> = outcomeOf {
-        retrying {
-            arrivalApi.arrivalsAtStop(cityCode = stop.cityCode, nodeId = stop.nodeId)
-                .itemsOrThrow()
-                .map { it.toDomain() }
-                .sortedBy { it.arrivalSeconds }
-        }
     }
 
     /** 특정 노선 하나의 도착 예정. 대기 화면 폴링용. */
@@ -172,7 +158,6 @@ class TransitRepository @Inject constructor(
         val order = chosen.nodeOrder ?: return@outcomeOf null
         BusProgress(
             vehicleNo = chosen.vehicleNo,
-            currentStopName = chosen.nodeName.orEmpty(),
             currentOrder = order,
             stopsRemaining = (alightOrder - order).coerceAtLeast(0),
         )
@@ -191,17 +176,8 @@ class TransitRepository @Inject constructor(
         }
     }.flowOn(Dispatchers.IO)
 
-    fun clearCaches() {
-        routeStopCache.clear()
-        stopRouteCache.clear()
-    }
-
     private fun kr.eodiga.wayfinder.data.remote.dto.BusArrivalDto.toDomain() = BusArrival(
-        routeId = routeId.orEmpty(),
-        routeNo = routeNo.orEmpty(),
-        kind = BusKind.from(routeType),
         arrivalSeconds = arrivalSeconds ?: 0,
-        stopsAway = prevStationCount ?: 0,
         vehicleType = vehicleType,
     )
 }
@@ -209,7 +185,6 @@ class TransitRepository @Inject constructor(
 /** 승차 중인 버스의 진행 상황. */
 data class BusProgress(
     val vehicleNo: String?,
-    val currentStopName: String,
     val currentOrder: Int,
     val stopsRemaining: Int,
 )

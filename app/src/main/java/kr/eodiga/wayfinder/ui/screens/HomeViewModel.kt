@@ -55,9 +55,6 @@ class HomeViewModel @Inject constructor(
         initialValue = HomeUiState(isConfigured = keys.hasServiceKey),
     )
 
-    fun refreshPermission() {
-        permission.value = location.hasPermission()
-    }
 }
 
 /* ──────────────────────────────────────────────────────────── */

@@ -9,7 +9,6 @@ data class Place(
     val address: String? = null,
     val location: LatLng,
     val kind: PlaceKind = PlaceKind.OTHER,
-    val phone: String? = null,
 )
 
 enum class PlaceKind { HOME, HOSPITAL, FAMILY, MART, PHARMACY, OTHER }
@@ -19,7 +18,6 @@ sealed interface JourneyLeg {
     val durationMinutes: Int
 
     data class Walk(
-        val from: LatLng,
         val to: LatLng,
         val distanceMeters: Int,
         val destinationName: String,
@@ -42,8 +40,6 @@ sealed interface JourneyLeg {
 
 /** 완성된 여정. */
 data class Journey(
-    val id: String = UUID.randomUUID().toString(),
-    val origin: LatLng,
     val destination: Place,
     val legs: List<JourneyLeg>,
 ) {

@@ -125,4 +125,33 @@ class VoiceSelectionTest {
         assertNull(VoiceGuide.selectBestVoice(listOf(voice("en-us", language = "en"))))
         assertNull(VoiceGuide.selectBestVoice(listOf(voice("ko-kr", notInstalled = true))))
     }
+
+    /* ── 설정 화면에 보여줄 한 줄 ─────────────────────────── */
+
+    @Test
+    fun `고른 보이스를 품질과 위치로 설명한다`() {
+        // 보호자가 이 줄을 읽어 전해줄 수 있어야 한다.
+        assertEquals(
+            "아주 좋음 · 기기에 저장됨",
+            VoiceGuide.describeVoice(voice("ko-kr-neural", quality = veryHigh)),
+        )
+        assertEquals(
+            "보통 · 인터넷 필요",
+            VoiceGuide.describeVoice(voice("ko-kr-net", requiresNetwork = true)),
+        )
+    }
+
+    @Test
+    fun `못 고른 경우도 화면에 뜰 말이 있어야 한다`() {
+        // 빈 칸은 "고장" 으로 읽힌다. 엔진 기본값을 쓰는 중이라고 말해 준다.
+        assertEquals("엔진 기본 목소리", VoiceGuide.describeVoice(null))
+    }
+
+    @Test
+    fun `가장 낮은 품질도 이름이 있다`() {
+        assertEquals(
+            "아주 낮음 · 기기에 저장됨",
+            VoiceGuide.describeVoice(voice("ko-kr-embedded", quality = veryLow)),
+        )
+    }
 }

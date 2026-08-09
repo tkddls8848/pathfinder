@@ -35,7 +35,6 @@ data class SavedPlaceEntity(
     val lat: Double,
     val lng: Double,
     val kind: String,
-    val phone: String?,
     val pinnedOrder: Int?,
     val visitCount: Int,
     val lastVisitedAt: Long,
@@ -46,7 +45,6 @@ data class SavedPlaceEntity(
         address = address,
         location = LatLng(lat, lng),
         kind = runCatching { PlaceKind.valueOf(kind) }.getOrDefault(PlaceKind.OTHER),
-        phone = phone,
     )
 
     companion object {
@@ -58,7 +56,6 @@ data class SavedPlaceEntity(
                 lat = place.location.lat,
                 lng = place.location.lng,
                 kind = place.kind.name,
-                phone = place.phone,
                 pinnedOrder = pinnedOrder,
                 visitCount = visitCount,
                 lastVisitedAt = lastVisitedAt,
@@ -114,7 +111,7 @@ interface GuardianDao {
 
 @Database(
     entities = [SavedPlaceEntity::class, GuardianEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class EodigaDatabase : RoomDatabase() {

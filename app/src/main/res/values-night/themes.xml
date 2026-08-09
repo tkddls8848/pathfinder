@@ -5,8 +5,8 @@
       노안에서는 검은 배경 위 흰 글자가 번져 보여(halation) 가독성이 떨어진다.
     -->
     <style name="Theme.Eodiga" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@color/surface_dark</item>
-        <item name="android:statusBarColor">@color/surface_dark</item>
-        <item name="android:navigationBarColor">@color/surface_dark</item>
+        <item name="android:windowBackground">@color/surface</item>
+        <item name="android:statusBarColor">@color/surface</item>
+        <item name="android:navigationBarColor">@color/surface</item>
     </style>
 </resources>

@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<!--
+  어디가요 — 길안내 목업.
+
+  앱을 만들기 전에 화면 흐름을 잡으려고 쓴 것이고, 지금은 두 가지 역할을 한다.
+    1. 안내 문장을 귀로 확인하는 자리. 앱을 기기에 올리지 않고도 들어볼 수 있다.
+    2. 화면 흐름을 남에게 보여주는 자리. 브라우저만 있으면 된다.
+
+  문안을 고치면 여기 SCRIPTS.after 도 같이 고쳐야 한다.
+  앱과 다른 문장을 들으면 판단이 무의미해진다.
+
+  SCRIPTS.before 는 2026-08-08 개편 전 문안이다. 지우지 말 것 —
+  "사 정거장" / "네 정거장" 처럼 무엇을 왜 고쳤는지 귀로 비교하는 용도다.
+
+  보이스 선택은 앱과 반대로 클라우드를 우선한다. 데스크톱 데모라
+  오프라인 제약이 없기 때문이다. 앱은 로컬 보이스를 먼저 쓴다 —
+  버스 안에서 데이터가 끊겨도 하차 안내는 나가야 한다.
+-->
+<title>어디가요 — 길안내 목업</title>
+<style>
+/* ── 페이지 바깥 (목업 확인용 크롬). 뷰어 테마를 따른다 ── */
+:root{
+  --page:#dedbd4;
+  --page-ink:#111111;
+  --page-muted:#57534a;
+  --panel:#232220;
+  --panel-ink:#f2f0eb;
+  --panel-line:#3d3a34;
+  --panel-key:#0b4fa8;
+  --mono: ui-monospace,"Cascadia Mono",Consolas,"D2Coding",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --page:#151412;
+    --page-ink:#f2f0eb;
+    --page-muted:#a29d92;
+    --panel:#232220;
+    --panel-ink:#f2f0eb;
+    --panel-line:#3d3a34;
+    --panel-key:#9ec5ff;
+  }
+}
+:root[data-theme="dark"]{
+  --page:#151412;
+  --page-ink:#f2f0eb;
+  --page-muted:#a29d92;
+  --panel:#232220;
+  --panel-ink:#f2f0eb;
+  --panel-line:#3d3a34;
+  --panel-key:#9ec5ff;
+}
+
+/* ── 폰 안쪽. 앱의 실제 색이므로 테마와 무관하게 고정 ── */
+#phone{
+  --ink:#111;
+  --bg:#FFFFFF;
+  --line:#111;
+  --blue:#0B4FA8;
+  --yellow:#FFD400;
+  --red:#B3261E;
+  --gray:#4A4A4A;
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+
+body{
+  margin:0;
+  background:var(--page);
+  color:var(--page-ink);
+  font-family:"Pretendard","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+  display:flex;flex-direction:column;align-items:center;
+  padding:16px 12px 48px;
+  word-break:keep-all;
+}
+
+.lede{
+  width:100%;max-width:420px;
+  font-size:13px;line-height:1.7;color:var(--page-muted);
+  margin:0 0 12px;
+}
+.lede b{color:var(--page-ink)}
+
+/* ── 목업 확인용 패널 (실제 앱에는 없음) ── */
+#devbar{
+  width:100%;max-width:420px;background:var(--panel);color:var(--panel-ink);
+  border:1px solid var(--panel-line);border-radius:12px;
+  padding:12px;margin-bottom:12px;font-size:12px;
+  display:flex;flex-direction:column;gap:12px;
+}
+#devbar .grp{display:flex;flex-direction:column;gap:6px}
+#devbar b{
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  opacity:.55;font-weight:600;
+}
+#devbar .row{display:flex;flex-wrap:wrap;gap:4px}
+#devbar button{
+  background:#38352f;color:var(--panel-ink);border:1px solid var(--panel-line);
+  border-radius:6px;padding:6px 9px;font-size:12px;cursor:pointer;
+  font-family:inherit;
+}
+#devbar button:hover{background:#454139}
+#devbar button:active{background:var(--panel-key);border-color:var(--panel-key)}
+#devbar button.on{background:var(--panel-key);border-color:var(--panel-key);color:#fff}
+#devbar select{
+  background:#38352f;color:var(--panel-ink);border:1px solid var(--panel-line);
+  border-radius:6px;padding:6px 8px;font-size:12px;width:100%;font-family:inherit;
+}
+#devbar .hint{font-size:11px;line-height:1.6;opacity:.6}
+#devbar :focus-visible{outline:2px solid var(--panel-key);outline-offset:2px}
+
+/* ── 폰 프레임 ── */
+#phone{
+  width:100%;max-width:420px;height:840px;background:var(--bg);color:var(--ink);
+  border:10px solid #111;border-radius:36px;overflow:hidden;position:relative;
+  display:flex;flex-direction:column;
+  box-shadow:0 18px 44px rgba(0,0,0,.28);
+}
+.screen{display:none;flex:1;flex-direction:column;padding:24px 20px 0;overflow-y:auto}
+.screen.on{display:flex}
+
+/* ── 공통 타이포 ── */
+.title{font-size:34px;font-weight:800;color:var(--ink);line-height:1.3;margin:8px 0 20px}
+.huge{font-size:64px;font-weight:900;line-height:1.1;color:var(--ink)}
+.num{font-size:140px;font-weight:900;line-height:1;color:var(--blue);text-align:center}
+.sub{font-size:26px;color:var(--gray);line-height:1.5}
+.center{text-align:center}
+
+/* ── 버튼 ── */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  width:100%;min-height:96px;margin-bottom:16px;
+  border:4px solid var(--line);border-radius:16px;background:#fff;
+  font-size:34px;font-weight:800;color:var(--ink);cursor:pointer;padding:10px
+}
+.btn:active{background:#EEE}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.small{min-height:64px;font-size:24px;border-width:3px;color:var(--gray);border-color:#AAA}
+.btn .ico{font-size:44px}
+
+/* ── 하단 고정 긴급 버튼 ── */
+#sos{
+  flex:0 0 auto;min-height:88px;background:var(--red);color:#fff;
+  font-size:30px;font-weight:800;display:flex;align-items:center;justify-content:center;
+  border-top:4px solid #7f1010;cursor:pointer
+}
+/* ── 카드 ── */
+.card{
+  border:4px solid var(--line);border-radius:16px;padding:20px;
+  font-size:30px;font-weight:700;line-height:1.4;margin-bottom:16px
+}
+.photo{
+  height:180px;border:4px dashed #888;border-radius:16px;background:#F2F2F2;
+  display:flex;align-items:center;justify-content:center;color:#888;font-size:22px;margin-bottom:16px
+}
+.arrow{font-size:170px;line-height:1;text-align:center;color:var(--blue);font-weight:900}
+.step{display:flex;align-items:center;gap:14px;font-size:30px;font-weight:700;margin:14px 0}
+.step .dot{width:20px;height:20px;border-radius:50%;background:var(--blue);flex:0 0 auto}
+.vline{width:4px;height:26px;background:#BBB;margin-left:8px}
+
+/* 상태 색 전환 */
+.screen.alert{background:var(--yellow)}
+.screen.done{background:#E8F5E9}
+.bus-tag{
+  display:inline-block;background:#B3261E;color:#fff;border-radius:12px;
+  padding:8px 20px;font-size:40px;font-weight:900
+}
+
+/* 지금 말하고 있는 문장 */
+#nowsaying{
+  width:100%;max-width:420px;margin-top:12px;
+  font-family:var(--mono);font-size:12px;line-height:1.7;
+  color:var(--page-muted);min-height:2.4em;
+}
+#nowsaying .k{color:var(--page-ink);font-weight:600}
+
+@media (prefers-reduced-motion: reduce){
+  *{transition:none !important;animation:none !important}
+}
+</style>
+</head>
+<body>
+
+<p class="lede">
+  목업 ⑪화면을 그대로 복원한 것입니다. 아래 패널의 버튼으로 화면을 넘기고,
+  <b>음성은 브라우저 TTS 로 실제로 나옵니다.</b>
+  문안은 이번에 바꾼 해요체가 기본이고, 패널에서 <b>고치기 전</b>과 귀로 비교할 수 있습니다.
+</p>
+
+<div id="devbar">
+  <div class="grp">
+    <b>화면 (실제 앱에는 없는 패널입니다)</b>
+    <div class="row">
+      <button onclick="go('home')">①홈</button>
+      <button onclick="go('search')">③찾기</button>
+      <button onclick="go('route')">④경로</button>
+      <button onclick="go('walk')">⑤도보</button>
+      <button onclick="go('stop')">⑥정류장</button>
+      <button onclick="go('wait')">⑦대기</button>
+      <button onclick="go('board')">⑧승차</button>
+      <button onclick="go('ride')">⑨이동중</button>
+      <button onclick="go('alight')">⑩하차</button>
+      <button onclick="go('subway')">지하철</button>
+      <button onclick="go('arrive')">⑪도착</button>
+      <button onclick="go('lost')">🆘길잃음</button>
+    </div>
+  </div>
+
+  <div class="grp">
+    <b>문안</b>
+    <div class="row">
+      <button id="btnAfter" class="on" onclick="setScript('after')">고친 뒤 (해요체)</button>
+      <button id="btnBefore" onclick="setScript('before')">고치기 전</button>
+      <button onclick="replay()">🔊 다시 듣기</button>
+    </div>
+    <div class="hint" id="scriptHint"></div>
+  </div>
+
+  <div class="grp">
+    <b>목소리</b>
+    <select id="voicePick" onchange="pickVoice(this.value)"></select>
+    <div class="hint">
+      목업은 데스크톱 데모라 <b>클라우드 보이스를 우선</b>합니다. 실제 앱은 반대로
+      로컬 보이스를 먼저 씁니다 — 버스 안에서 데이터가 끊겨도 하차 안내가 나가야 하기 때문입니다.
+    </div>
+  </div>
+</div>
+
+<div id="phone">
+
+  <!-- ① 홈 -->
+  <section id="home" class="screen on">
+    <div class="title">어디로 가세요?</div>
+    <div class="btn" onclick="go('route')"><span class="ico">🏠</span>집</div>
+    <div class="btn" onclick="go('route')"><span class="ico">🏥</span>병원</div>
+    <div class="btn" onclick="go('route')"><span class="ico">👨</span>아들집</div>
+    <div class="btn" onclick="go('search')"><span class="ico">🔍</span>다른 곳</div>
+  </section>
+
+  <!-- ③ 다른 곳 찾기 -->
+  <section id="search" class="screen">
+    <div class="title">어디에 가시나요?</div>
+    <div class="btn primary" style="min-height:200px;flex-direction:column;gap:4px"
+         onclick="go('route')">
+      <span class="ico" style="font-size:70px">🎤</span>
+      <span style="font-size:30px">누르고 말씀하세요</span>
+    </div>
+    <div class="sub" style="margin:10px 0 12px">최근에 간 곳</div>
+    <div class="btn" onclick="go('route')">성모의원</div>
+    <div class="btn" onclick="go('route')">하나로마트</div>
+  </section>
+
+  <!-- ④ 경로 확인 -->
+  <section id="route" class="screen">
+    <div class="title">성모의원 까지</div>
+    <div class="step"><span class="dot"></span>걸어서 3분</div>
+    <div class="vline"></div>
+    <div class="step"><span class="dot"></span><span class="bus-tag">7016</span> 버스</div>
+    <div class="step" style="margin-left:34px;color:var(--gray)">4 정거장</div>
+    <div class="vline"></div>
+    <div class="step"><span class="dot"></span>걸어서 2분</div>
+    <div class="card center" style="margin-top:20px">모두 약 25분</div>
+    <div class="btn primary" onclick="go('walk')">출발합니다</div>
+    <div class="btn small" onclick="alert('지도 화면 (기본 숨김)')">지도 보기</div>
+  </section>
+
+  <!-- ⑤ 도보 안내 -->
+  <section id="walk" class="screen">
+    <div class="arrow">↱</div>
+    <div class="huge center">오른쪽으로<br>도세요</div>
+    <div class="num" style="font-size:96px;margin-top:10px">20 걸음</div>
+    <div class="card center">파리바게뜨<br>지나서 바로</div>
+    <div class="btn small" onclick="go('stop')">(다음 단계)</div>
+  </section>
+
+  <!-- ⑥ 정류장 도착 확인 -->
+  <section id="stop" class="screen">
+    <div class="title">도착했습니다</div>
+    <div class="huge">중앙시장<br>정류장</div>
+    <div class="photo" style="margin-top:16px">정류장 실제 사진</div>
+    <div class="card">파란 지붕,<br>의자 있는 곳</div>
+    <div class="btn primary" onclick="go('wait')">네, 여기예요</div>
+    <div class="btn small" onclick="go('lost')">안 보여요</div>
+  </section>
+
+  <!-- ⑦ 버스 기다리기 -->
+  <section id="wait" class="screen">
+    <div class="center" style="margin-top:20px">
+      <span class="bus-tag" style="font-size:56px">7016</span>
+      <div class="huge" style="margin-top:14px">빨간 버스</div>
+    </div>
+    <div class="num" id="waitMin">3</div>
+    <div class="huge center" id="waitTxt">분 뒤 도착</div>
+    <div class="card center" style="margin-top:auto;margin-bottom:20px;font-size:26px;color:var(--gray)">
+      1분 전이 되면<br>진동으로 알려드려요
+    </div>
+    <div class="btn small" onclick="busNear()">(버스 도착 임박 상황 보기)</div>
+  </section>
+
+  <!-- ⑧ 승차 확인 -->
+  <section id="board" class="screen">
+    <div class="title">버스에 타셨나요?</div>
+    <div class="center"><span class="bus-tag" style="font-size:56px">7016</span></div>
+    <div class="card center" style="margin-top:24px">
+      카드를 대고<br>자리에 앉으세요
+    </div>
+    <div class="btn primary" style="margin-top:auto" onclick="go('ride')">네, 탔어요</div>
+    <div class="btn small" onclick="go('wait')">아직 못 탔어요</div>
+  </section>
+
+  <!-- ⑨ 이동 중 -->
+  <section id="ride" class="screen">
+    <div class="huge center" style="margin-top:30px">내리기까지</div>
+    <div class="num" id="left">4</div>
+    <div class="huge center">정거장</div>
+    <div class="card center" style="margin-top:30px;font-size:26px;color:var(--gray)">
+      다음 정류장<br><b style="color:var(--ink);font-size:32px">시청 앞</b>
+    </div>
+    <div class="btn small" onclick="go('alight')">(하차 2정거장 전 보기)</div>
+  </section>
+
+  <!-- ⑩ 하차 준비 -->
+  <section id="alight" class="screen alert">
+    <div class="huge center" style="margin-top:60px" id="alightTitle">
+      곧 내립니다<br>일어날 준비하세요
+    </div>
+    <div class="center" style="font-size:120px;margin:30px 0" id="alightIco">🧍</div>
+    <div class="card center" style="background:#fff" id="alightSub">2 정거장 남았습니다</div>
+    <div class="btn small" style="margin-top:auto" onclick="ringBell()">(1정거장 전 보기)</div>
+  </section>
+
+  <!-- 지하철 승강기 안내 (도보 구간 대체) -->
+  <section id="subway" class="screen">
+    <div class="huge">🛗 승강기<br>타세요</div>
+    <div class="card" style="margin-top:20px">3번 출구 옆<br>파란 문</div>
+    <div class="card">지하 2층에서<br>내리세요</div>
+    <div class="card" style="border-color:var(--blue);color:var(--blue)">
+      4호선 타는곳<br>오이도 방향
+    </div>
+    <div class="btn small" onclick="go('ride')">(다음 단계)</div>
+  </section>
+
+  <!-- ⑪ 도착 -->
+  <section id="arrive" class="screen done">
+    <div class="center" style="font-size:130px;margin-top:60px">🎉</div>
+    <div class="huge center">도착했습니다</div>
+    <div class="card center" style="background:#fff;margin-top:24px">성모의원<br>바로 앞입니다</div>
+    <div class="btn primary" style="margin-top:auto" onclick="go('home')">처음으로</div>
+  </section>
+
+  <!-- 🆘 길을 잃었어요 -->
+  <section id="lost" class="screen">
+    <div class="huge">걱정마세요</div>
+    <div class="sub" style="margin:16px 0 10px">지금 계신 곳</div>
+    <div class="card">중구 명동<br>우리은행 앞</div>
+    <div class="btn" style="border-color:var(--red);color:var(--red)"
+         onclick="alert('아들에게 전화 + 현재 위치 문자 자동 전송')">
+      <span class="ico">📞</span>아들에게 전화
+    </div>
+    <div class="btn primary" onclick="go('walk')">다시 안내받기</div>
+  </section>
+
+  <!-- 하단 고정 긴급 버튼 -->
+  <div id="sos" onclick="go('lost')">길을 잃었어요</div>
+</div>
+
+<div id="nowsaying"></div>
+
+<script>
+/* ─────────────────────────────────────────────────────────
+   문안 두 벌.
+   after  = 2026-08-08 개편. 긴급 3종은 명령형 그대로, 나머지는 해요체.
+   before = 개편 전. "사 정거장" 처럼 수사가 틀린 것도 그대로 둔다.
+            귀로 비교하라고 남겨 둔 것이다.
+   ───────────────────────────────────────────────────────── */
+const SCRIPTS = {
+  after: {
+    home  :'어디로 가세요?',
+    search:'어디에 가시나요? 누르고 말씀하세요.',
+    route :'성모의원까지 약 이십오 분 걸려요.',
+    walk  :'이제 중앙시장 정류장 쪽으로, 스무 걸음쯤 걸어가시면 돼요.',
+    stop  :'중앙시장 정류장에 다 왔어요. 맞으면 네 여기예요를 눌러 주세요.',
+    wait  :'칠 공 일 육 번 버스가 삼 분 뒤에 와요. 조금만 기다리시면 돼요. 계단 없는 버스라 타기 편하실 거예요.',
+    board :'칠 공 일 육 번 버스에 타셨으면, 네 탔어요를 눌러 주세요.',
+    ride  :'네 정거장 더 가면 내려요.',
+    alight:'곧 내립니다. 일어날 준비하세요.',
+    subway:'승강기를 타고 지하 이 층에서 내리시면 돼요.',
+    arrive:'다 왔어요. 성모의원 바로 앞이에요.',
+    lost  :'걱정 마세요. 지금 계신 곳은 중구 명동 우리은행 앞이에요.',
+    near  :'칠 공 일 육 번 버스가 곧 와요. 손을 드세요.',
+    bell  :'벨을 누르세요. 다음 정류장에서 내립니다.'
+  },
+  before: {
+    home  :'어디로 가세요?',
+    search:'어디에 가시나요? 누르고 말씀하세요.',
+    route :'성모의원까지 약 이십오분 걸립니다.',
+    walk  :'약 스무 걸음 걸어서 중앙시장 정류장으로 가세요.',
+    stop  :'중앙시장 정류장에 도착했습니다. 맞으면 네를 눌러주세요.',
+    wait  :'칠 공 일 육 번 버스가 삼분 뒤에 옵니다. 계단 없는 저상버스입니다.',
+    board :'칠 공 일 육 번 버스에 타셨으면, 네 탔어요를 눌러주세요.',
+    ride  :'4정거장 뒤에 내립니다.',
+    alight:'곧 내립니다. 일어날 준비하세요.',
+    subway:'승강기를 타고 지하 이층에서 내리세요.',
+    arrive:'도착했습니다. 성모의원 앞입니다.',
+    lost  :'걱정마세요. 지금 계신 곳은 중구 명동 우리은행 앞입니다.',
+    near  :'칠 공 일 육 번 버스가 곧 옵니다. 손을 드세요.',
+    bell  :'벨을 누르세요. 다음 정류장에서 내립니다.'
+  }
+};
+
+const HINTS = {
+  after :'⑨이동중에서 "네 정거장" — 정거장은 순우리말 단위다.',
+  before:'⑨이동중에서 "사 정거장" 으로 읽힌다. TTS 는 숫자를 보면 한자어로 읽는다.'
+};
+
+let scriptName = 'after';
+let LINES = SCRIPTS.after;
+let lastKey = 'home';
+
+function setScript(name){
+  scriptName = name;
+  LINES = SCRIPTS[name];
+  document.getElementById('btnAfter').classList.toggle('on', name === 'after');
+  document.getElementById('btnBefore').classList.toggle('on', name === 'before');
+  document.getElementById('scriptHint').textContent = HINTS[name];
+  replay();
+}
+
+function replay(){ say(LINES[lastKey], lastKey); }
+
+/* ─────────────────────────────────────────────────────────
+   보이스 선택.
+
+   원래 목업은 u.lang='ko-KR' 만 주고 보이스를 고르지 않았다.
+   그러면 Windows Chrome 이 Microsoft Heami(SAPI5)를 잡아 기계음이 난다.
+   앱에 있던 것과 똑같은 버그였다.
+
+   여기서는 이름만 보고 고른다 — 브라우저는 품질 정보를 주지 않는다.
+   ───────────────────────────────────────────────────────── */
+let voices = [], chosen = null;
+
+function scoreVoice(v){
+  let s = 0;
+  if (!v.localService) s += 100;                        // 클라우드 = 대체로 뉴럴
+  const n = (v.name + ' ' + v.voiceURI).toLowerCase();
+  if (n.includes('google')) s += 50;
+  if (/heami|sapi|microsoft/.test(n)) s -= 50;
+  return s;
+}
+
+function loadVoices(){
+  if (!window.speechSynthesis) return;
+  voices = speechSynthesis.getVoices()
+    .filter(v => (v.lang || '').toLowerCase().replace('_','-').startsWith('ko'));
+
+  const sel = document.getElementById('voicePick');
+  sel.innerHTML = '';
+
+  if (!voices.length){
+    sel.innerHTML = '<option>한국어 보이스가 없습니다</option>';
+    document.getElementById('nowsaying').textContent =
+      '이 브라우저에 한국어 보이스가 없어 음성이 나오지 않습니다.';
+    return;
+  }
+
+  voices.sort((a,b) => scoreVoice(b) - scoreVoice(a) || a.name.localeCompare(b.name));
+  chosen = voices[0];
+
+  voices.forEach((v,i) => {
+    const o = document.createElement('option');
+    o.value = i;
+    o.textContent = v.name + (v.localService ? '  · 로컬' : '  · 클라우드');
+    sel.appendChild(o);
+  });
+  sel.value = '0';
+}
+
+function pickVoice(i){ chosen = voices[i]; replay(); }
+
+function say(text, key){
+  if (key) lastKey = key;
+  const box = document.getElementById('nowsaying');
+  if (!text){ box.textContent = ''; return; }
+
+  box.innerHTML = '<span class="k">' +
+    (scriptName === 'after' ? '고친 뒤' : '고치기 전') + '</span>  ' +
+    text.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'ko-KR';
+  u.rate = 0.85;          // 앱의 speechRate 와 같은 값
+  u.pitch = 1.0;          // 난청은 고주파부터 온다 — 피치를 올리지 않는다
+  if (chosen) u.voice = chosen;
+  speechSynthesis.speak(u);
+}
+
+function buzz(p){ if (navigator.vibrate) navigator.vibrate(p); }
+
+function go(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  document.getElementById('sos').style.display =
+    (id === 'home' || id === 'arrive') ? 'none' : 'flex';
+  say(LINES[id], id);
+}
+
+/* ⑦ 버스 도착 임박 → 화면 노랑 + 진동 */
+function busNear(){
+  const s = document.getElementById('wait');
+  s.classList.add('alert');
+  document.getElementById('waitMin').textContent = '1';
+  document.getElementById('waitTxt').innerHTML = '곧 옵니다<br>손을 드세요';
+  buzz([300,150,300]);
+  say(LINES.near, 'near');
+  setTimeout(() => {
+    s.classList.remove('alert');
+    document.getElementById('waitMin').textContent = '3';
+    document.getElementById('waitTxt').textContent = '분 뒤 도착';
+    go('board');
+  }, 3600);
+}
+
+/* ⑩ 2정거장 전 → 1정거장 전 (벨 누르기) */
+function ringBell(){
+  document.getElementById('alightTitle').innerHTML = '🔔 벨을<br>누르세요';
+  document.getElementById('alightIco').textContent = '🔔';
+  document.getElementById('alightSub').textContent = '다음에 내립니다';
+  buzz([500,200,500,200,500]);
+  say(LINES.bell, 'bell');
+  setTimeout(() => {
+    document.getElementById('alightTitle').innerHTML = '곧 내립니다<br>일어날 준비하세요';
+    document.getElementById('alightIco').textContent = '🧍';
+    document.getElementById('alightSub').textContent = '2 정거장 남았습니다';
+    go('arrive');
+  }, 4200);
+}
+
+if (window.speechSynthesis){
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+document.getElementById('scriptHint').textContent = HINTS.after;
+go('home');
+</script>
+
+</body>
+</html>

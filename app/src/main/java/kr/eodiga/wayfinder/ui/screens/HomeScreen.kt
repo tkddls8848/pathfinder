@@ -6,10 +6,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.item
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import kr.eodiga.wayfinder.ui.components.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -36,6 +35,7 @@ fun HomeScreen(
     onDestinationSelected: (Place) -> Unit,
     onSearchOther: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenMusic: () -> Unit,
     onRequestLocationPermission: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -131,6 +131,18 @@ fun HomeScreen(
                     onClick = { onDestinationSelected(place) },
                 )
             }
+        }
+
+        item {
+            Spacer(Modifier.height(24.dp))
+            // 목적지 버튼과 같은 크기로 둔다. 이동 중에 켜는 기능이지만 안내 화면에는
+            // 넣지 않았다 — 그 화면은 "지금 무엇을 하면 되는지" 하나만 말해야 한다.
+            // 여기서 켜 두면 길안내로 넘어가도 노래는 계속 나온다.
+            DestinationButton(
+                label = "음악 듣기",
+                emoji = "🎵",
+                onClick = onOpenMusic,
+            )
         }
 
         item {

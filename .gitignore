@@ -3,7 +3,8 @@
 /local.properties
 /.idea/
 .DS_Store
-/build
+# 루트만이 아니라 모듈 빌드 산출물도 함께 (app/build 등).
+build/
 /captures
 .externalNativeBuild
 .cxx

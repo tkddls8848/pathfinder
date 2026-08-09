@@ -22,6 +22,16 @@
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
 
+    <!--
+      기기에 저장된 노래를 읽어 이동 중에 틀어준다. 선택 사항이다 —
+      거부하면 음악 화면만 비활성화되고 길안내는 그대로 동작한다.
+      API 33 에서 저장소 권한이 매체별로 쪼개져 둘로 갈라 선언한다.
+    -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
     <!-- 음성 인식·음성 안내를 위해 해당 앱을 조회할 수 있어야 한다 (Android 11+) -->
     <queries>
         <intent>

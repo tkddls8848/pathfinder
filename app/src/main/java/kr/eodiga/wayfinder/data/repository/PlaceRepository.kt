@@ -88,7 +88,6 @@ class PlaceRepository @Inject constructor(
                             address = dto.address,
                             location = LatLng(lat, lng),
                             kind = PlaceKind.HOSPITAL,
-                            phone = dto.phone,
                         )
                     }
                     .filter { it.location.isValid() }

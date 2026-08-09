@@ -12,7 +12,7 @@ import java.io.IOException
  */
 sealed interface Outcome<out T> {
     data class Success<T>(val value: T) : Outcome<T>
-    data class Failure(val reason: FailureReason, val cause: Throwable? = null) : Outcome<Nothing>
+    data class Failure(val reason: FailureReason) : Outcome<Nothing>
 
     fun getOrNull(): T? = when (this) {
         is Success -> value
@@ -57,7 +57,7 @@ suspend inline fun <T> outcomeOf(crossinline block: suspend () -> T): Outcome<T>
     } catch (e: CancellationException) {
         throw e
     } catch (e: Throwable) {
-        Outcome.Failure(e.toFailureReason(), e)
+        Outcome.Failure(e.toFailureReason())
     }
 
 /**

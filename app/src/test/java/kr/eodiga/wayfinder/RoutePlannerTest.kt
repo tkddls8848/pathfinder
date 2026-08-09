@@ -30,11 +30,11 @@ class RoutePlannerTest {
     )
 
     private fun stop(id: String, name: String, lat: Double, lng: Double) = BusStop(
-        cityCode = 25, nodeId = id, nodeNo = null, name = name, location = LatLng(lat, lng),
+        cityCode = 25, nodeId = id, name = name, location = LatLng(lat, lng),
     )
 
     private fun routeStop(order: Int, stop: BusStop) = RouteStop(
-        order = order, nodeId = stop.nodeId, nodeNo = null, name = stop.name, location = stop.location,
+        order = order, nodeId = stop.nodeId, name = stop.name, location = stop.location,
     )
 
     @Test
@@ -121,7 +121,7 @@ class RoutePlannerTest {
 
     private fun journeyOf(walkMinutes: Int, busLegs: List<Int>): Journey {
         val legs = mutableListOf<JourneyLeg>()
-        legs += JourneyLeg.Walk(origin, origin, 100, "정류장", walkMinutes)
+        legs += JourneyLeg.Walk(origin, 100, "정류장", walkMinutes)
         busLegs.forEach { minutes ->
             legs += JourneyLeg.Bus(
                 route = BusRoute(25, "R", "1"),
@@ -132,6 +132,6 @@ class RoutePlannerTest {
                 durationMinutes = minutes,
             )
         }
-        return Journey(origin = origin, destination = destination, legs = legs)
+        return Journey(destination = destination, legs = legs)
     }
 }

@@ -31,15 +31,6 @@ interface TagoBusStopApi {
         @Query("pageNo") pageNo: Int = 1,
     ): TagoEnvelope<NearbyStopDto>
 
-    /** 정류소 이름으로 검색. 도시코드 안에서만 유효하다. */
-    @GET("BusSttnInfoInqireService/getSttnNoList")
-    suspend fun searchStops(
-        @Query("cityCode") cityCode: Int,
-        @Query("nodeNm") name: String,
-        @Query("numOfRows") numOfRows: Int = 30,
-        @Query("pageNo") pageNo: Int = 1,
-    ): TagoEnvelope<NearbyStopDto>
-
     /** 해당 정류소를 지나는 노선 목록. */
     @GET("BusSttnInfoInqireService/getSttnThrghRouteList")
     suspend fun routesThroughStop(
@@ -51,18 +42,6 @@ interface TagoBusStopApi {
 }
 
 interface TagoBusArrivalApi {
-
-    /**
-     * 정류소별 실시간 도착 예정 정보.
-     * 데이터셋: 국토교통부_(TAGO)_버스도착정보 (data.go.kr/data/15098530)
-     */
-    @GET("ArvlInfoInqireService/getSttnAcctoArvlPrearngeInfoList")
-    suspend fun arrivalsAtStop(
-        @Query("cityCode") cityCode: Int,
-        @Query("nodeId") nodeId: String,
-        @Query("numOfRows") numOfRows: Int = 30,
-        @Query("pageNo") pageNo: Int = 1,
-    ): TagoEnvelope<BusArrivalDto>
 
     /** 특정 노선 한 대만 조회. 대기 화면에서 폴링 비용을 줄이는 데 쓴다. */
     @GET("ArvlInfoInqireService/getSttnAcctoSpcifyRouteBusArvlPrearngeInfoList")
@@ -80,8 +59,12 @@ interface TagoBusRouteApi {
     /**
      * 노선별 경유 정류소 목록(순번 포함).
      * 데이터셋: 국토교통부_(TAGO)_버스노선정보 (data.go.kr/data/15098529)
+     *
+     * 오퍼레이션 이름에 `Thrgh`(경유)가 들어간다. `getRouteAcctoSttnList` 로 부르면
+     * `NO_OPENAPI_SERVICE_ERROR` 가 돌아온다 — 인증이나 파라미터 문제로 보이는 오류라
+     * 원인을 찾기 어렵다. 실제로 이 오타 때문에 경로 탐색이 통째로 실패하고 있었다.
      */
-    @GET("BusRouteInfoInqireService/getRouteAcctoSttnList")
+    @GET("BusRouteInfoInqireService/getRouteAcctoThrghSttnList")
     suspend fun stopsOnRoute(
         @Query("cityCode") cityCode: Int,
         @Query("routeId") routeId: String,

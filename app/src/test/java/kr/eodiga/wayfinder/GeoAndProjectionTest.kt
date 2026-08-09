@@ -32,15 +32,6 @@ class GeoTest {
         assertEquals(100, Geo.steps(65.0))
     }
 
-    @Test
-    fun `방위각은 정북 기준 시계방향이다`() {
-        val origin = LatLng(37.5, 127.0)
-        val north = LatLng(37.6, 127.0)
-        val east = LatLng(37.5, 127.1)
-
-        assertEquals(0.0, Geo.bearingDegrees(origin, north), 1.0)
-        assertEquals(90.0, Geo.bearingDegrees(origin, east), 1.0)
-    }
 }
 
 class Epsg5179Test {

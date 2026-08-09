@@ -12,6 +12,7 @@ import kr.eodiga.wayfinder.domain.model.Place
 import kr.eodiga.wayfinder.ui.screens.GuidanceScreen
 import kr.eodiga.wayfinder.ui.screens.HomeScreen
 import kr.eodiga.wayfinder.ui.screens.LostScreen
+import kr.eodiga.wayfinder.ui.screens.MusicScreen
 import kr.eodiga.wayfinder.ui.screens.RouteScreen
 import kr.eodiga.wayfinder.ui.screens.SearchScreen
 import kr.eodiga.wayfinder.ui.screens.SettingsScreen
@@ -25,6 +26,7 @@ object Routes {
     const val GUIDANCE = "guidance"
     const val LOST = "lost"
     const val SETTINGS = "settings"
+    const val MUSIC = "music"
 }
 
 /**
@@ -37,7 +39,6 @@ object Routes {
 @Singleton
 class NavigationStore @Inject constructor() {
     var selectedPlace: Place? = null
-    var confirmedJourney: Journey? = null
 
     /**
      * 음성 인식 결과. Activity 가 쓰고 SearchViewModel 이 소비한다.
@@ -53,6 +54,7 @@ fun EodigaNavHost(
     store: NavigationStore,
     onStartVoiceInput: () -> Unit,
     onRequestLocationPermission: () -> Unit,
+    onRequestMusicPermission: () -> Unit,
     onStartJourney: (Journey) -> Unit,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
@@ -70,6 +72,7 @@ fun EodigaNavHost(
                 },
                 onSearchOther = { navController.navigate(Routes.SEARCH) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onOpenMusic = { navController.navigate(Routes.MUSIC) },
                 onRequestLocationPermission = onRequestLocationPermission,
             )
         }
@@ -93,7 +96,6 @@ fun EodigaNavHost(
                 RouteScreen(
                     destination = place,
                     onStart = { journey ->
-                        store.confirmedJourney = journey
                         onStartJourney(journey)
                         navController.navigate(Routes.GUIDANCE) {
                             // 안내 중에 뒤로 눌러 경로 화면으로 돌아가면 혼란스럽다.
@@ -124,6 +126,13 @@ fun EodigaNavHost(
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onAddPlace = { navController.navigate(Routes.SEARCH) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.MUSIC) {
+            MusicScreen(
+                onRequestMusicPermission = onRequestMusicPermission,
                 onBack = { navController.popBackStack() },
             )
         }

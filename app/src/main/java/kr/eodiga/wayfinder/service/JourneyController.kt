@@ -98,12 +98,10 @@ class JourneyController @Inject constructor(
     }
 
     /** "네, 탔어요". 승차만은 오탐이 위험해 사람이 확인한다. */
-    fun confirmBoarded(vehicleNo: String? = null) {
+    fun confirmBoarded() {
         val state = _state.value
         val legIndex = state.stage.legIndex
         val leg = state.journey?.legs?.getOrNull(legIndex) as? JourneyLeg.Bus ?: return
-        boardedVehicleNo = vehicleNo
-
         transitionTo(GuidanceStage.Riding(legIndex, leg.stopCount, leg.intermediateStops.getOrNull(1)?.name))
         activeJobs?.cancel()
         activeJobs = scope.launch { trackRide(legIndex, leg) }
@@ -181,7 +179,10 @@ class JourneyController @Inject constructor(
         transitionTo(GuidanceStage.WaitingForBus(nextIndex, null))
         activeJobs = scope.launch { trackWaiting(nextIndex) }
         // 정류장을 확인한 시점의 노선 정보를 미리 읽어준다.
-        voice.speak("${VoiceGuide.busNumberToSpeech(busLeg.route.routeNo)}번 버스를 타세요.", urgent = true)
+        voice.speak(
+            "${VoiceGuide.busNumberToSpeech(busLeg.route.routeNo)}번 버스를 타시면 돼요.",
+            priority = Priority.INTERRUPT,
+        )
     }
 
     /** 대기 구간: 도착정보를 폴링하며 임박하면 진동 + 승차 확인 화면으로. */
@@ -204,8 +205,9 @@ class JourneyController @Inject constructor(
                     if (arrival != null && arrival.isImminent) {
                         haptics.busApproaching()
                         voice.speak(
-                            "${VoiceGuide.busNumberToSpeech(leg.route.routeNo)}번 버스가 곧 옵니다. 손을 드세요.",
-                            urgent = true,
+                            // "손을 드세요" 는 몇 초 안에 해야 하는 동작이라 명령형을 남긴다.
+                            "${VoiceGuide.busNumberToSpeech(leg.route.routeNo)}번 버스가 곧 와요. 손을 드세요.",
+                            priority = Priority.CRITICAL,
                         )
                         transitionTo(GuidanceStage.Boarding(legIndex))
                         // 버스가 도착했으므로 폴링을 멈춘다. 계속 두면 8초마다 진동이
@@ -245,7 +247,11 @@ class JourneyController @Inject constructor(
 
             when {
                 remaining <= 0 -> {
-                    voice.speak("${leg.alightStop.name}입니다. 내리세요.", urgent = true, allowRepeat = true)
+                    voice.speak(
+                        "${leg.alightStop.name}입니다. 내리세요.",
+                        priority = Priority.CRITICAL,
+                        allowRepeat = true,
+                    )
                     haptics.prepareToAlight()
                     confirmAlighted()
                 }
@@ -255,7 +261,11 @@ class JourneyController @Inject constructor(
                     if (!announcedBell) {
                         announcedBell = true
                         haptics.prepareToAlight()
-                        voice.speak("벨을 누르세요. 다음 정류장에서 내립니다.", urgent = true, allowRepeat = true)
+                        voice.speak(
+                            "벨을 누르세요. 다음 정류장에서 내립니다.",
+                            priority = Priority.CRITICAL,
+                            allowRepeat = true,
+                        )
                     }
                 }
 
@@ -264,7 +274,11 @@ class JourneyController @Inject constructor(
                     if (!announcedPrepare) {
                         announcedPrepare = true
                         haptics.prepareToAlight()
-                        voice.speak("곧 내립니다. 일어날 준비하세요.", urgent = true, allowRepeat = true)
+                        voice.speak(
+                            "곧 내립니다. 일어날 준비하세요.",
+                            priority = Priority.CRITICAL,
+                            allowRepeat = true,
+                        )
                     }
                 }
 
@@ -272,7 +286,7 @@ class JourneyController @Inject constructor(
                     _state.update {
                         it.copy(stage = GuidanceStage.Riding(legIndex, remaining, nextStopName))
                     }
-                    voice.speak("${remaining}정거장 남았습니다.")
+                    voice.speak("${VoiceGuide.stopCountToSpeech(remaining)} 남았어요.")
                 }
             }
         }
@@ -280,23 +294,44 @@ class JourneyController @Inject constructor(
 
     /* ── 안내 문장 ───────────────────────────────────────────── */
 
+    /*
+     * 말투는 상황에 따라 둘로 나뉜다.
+     *
+     *  긴급 (벨·하차준비·하차) — 명령형 그대로.
+     *      몇 초 안에 몸을 움직여야 하는 안내다. 부드럽게 돌려 말하면
+     *      "지금 나한테 하라는 건가?" 를 판단하는 데 시간이 든다.
+     *  나머지 (도보·대기·이동중·도착) — 해요체.
+     *      옆에서 같이 가는 사람이 말하듯. 명령을 계속 받으면 지시받는 기분이 든다.
+     *
+     * 화면에 보이는 글자는 숫자를 그대로 쓰지만(잠금화면에서 눈으로 읽어야 한다),
+     * 말로 나가는 수는 단위에 맞는 수사로 바꾼다. [VoiceGuide.stopCountToSpeech] 참고.
+     */
+
     private fun transitionTo(stage: GuidanceStage) {
         _state.update { it.copy(stage = stage) }
         announceCurrentStage(force = false)
     }
 
     private fun announceWaiting(leg: JourneyLeg.Bus, arrival: BusArrival?) {
-        val minutes = arrival?.arrivalMinutes ?: return
+        if (arrival == null) return
+        val minutes = arrival.arrivalMinutes
         if (minutes <= 0) return
-        val lowFloor = if (arrival.isLowFloor) " 계단 없는 저상버스입니다." else ""
-        voice.speak("${VoiceGuide.busNumberToSpeech(leg.route.routeNo)}번 버스가 ${minutes}분 뒤에 옵니다.$lowFloor")
+        val lowFloor = if (arrival.isLowFloor) " 계단 없는 버스라 타기 편하실 거예요." else ""
+        voice.speak(
+            "${VoiceGuide.busNumberToSpeech(leg.route.routeNo)}번 버스가 ${minutes}분 뒤에 와요. " +
+                "조금만 기다리시면 돼요.$lowFloor",
+        )
     }
 
     private fun announceCurrentStage(force: Boolean) {
         val state = _state.value
         val journey = state.journey ?: return
         val text = spokenTextFor(journey, state.stage) ?: return
-        voice.speak(text, urgent = force, allowRepeat = force)
+        voice.speak(
+            text,
+            priority = if (force) Priority.INTERRUPT else Priority.NORMAL,
+            allowRepeat = force,
+        )
     }
 
     private fun spokenTextFor(journey: Journey, stage: GuidanceStage): String? {
@@ -304,19 +339,24 @@ class JourneyController @Inject constructor(
         return when (stage) {
             is GuidanceStage.Walking -> {
                 val walk = leg as? JourneyLeg.Walk ?: return null
-                "${VoiceGuide.distanceToSpeech(stage.remainingMeters)} 걸어서 ${walk.destinationName}으로 가세요."
+                // "쪽으로" 로 붙이는 것은 말투 때문만이 아니다. 이름 뒤에 바로 조사를 붙이면
+                // 받침에 따라 으로/로 가 갈리는데("센터으로"), 정류장 이름은 전국에서 온다.
+                "이제 ${walk.destinationName} 쪽으로, " +
+                    "${VoiceGuide.distanceToSpeech(stage.remainingMeters)}쯤 걸어가시면 돼요."
             }
             is GuidanceStage.ArrivedAtStop ->
-                "${(leg as? JourneyLeg.Walk)?.destinationName ?: "정류장"}에 도착했습니다. 맞으면 네를 눌러주세요."
+                "${(leg as? JourneyLeg.Walk)?.destinationName ?: "정류장"}에 다 왔어요. " +
+                    "맞으면 네 여기예요를 눌러 주세요."
             is GuidanceStage.WaitingForBus -> null // announceWaiting 이 담당
             is GuidanceStage.Boarding -> {
                 val bus = leg as? JourneyLeg.Bus ?: return null
-                "${VoiceGuide.busNumberToSpeech(bus.route.routeNo)}번 버스에 타셨으면, 네 탔어요를 눌러주세요."
+                "${VoiceGuide.busNumberToSpeech(bus.route.routeNo)}번 버스에 타셨으면, 네 탔어요를 눌러 주세요."
             }
-            is GuidanceStage.Riding -> "${stage.stopsRemaining}정거장 뒤에 내립니다."
+            is GuidanceStage.Riding -> "${VoiceGuide.stopCountToSpeech(stage.stopsRemaining)} 더 가면 내려요."
+            // 아래 셋은 긴급 안내라 명령형 그대로 둔다.
             is GuidanceStage.PrepareToAlight -> "곧 내립니다. 일어날 준비하세요."
             is GuidanceStage.RingBell -> "벨을 누르세요. 다음 정류장에서 내립니다."
-            GuidanceStage.Arrived -> "도착했습니다. ${journey.destination.name} 앞입니다."
+            GuidanceStage.Arrived -> "다 왔어요. ${journey.destination.name} 바로 앞이에요."
         }
     }
 

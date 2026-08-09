@@ -42,17 +42,6 @@ class RegionResolver @Inject constructor(
         return Region(sido = sido, sigungu = sigungu)
     }
 
-    /** 길을 잃었을 때 어르신에게 읽어줄 "눈에 보이는 주소". */
-    suspend fun describe(at: LatLng): String? {
-        val coder = geocoder ?: return null
-        val address = withContext(Dispatchers.IO) { firstAddress(coder, at) } ?: return null
-        return listOfNotNull(
-            address.subAdminArea ?: address.locality,
-            address.subLocality,
-            address.thoroughfare,
-        ).distinct().joinToString(" ").ifBlank { address.getAddressLine(0) }
-    }
-
     private suspend fun firstAddress(coder: Geocoder, at: LatLng): Address? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             suspendCancellableCoroutine { cont ->

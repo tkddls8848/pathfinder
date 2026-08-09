@@ -5,11 +5,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.item
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import kr.eodiga.wayfinder.ui.components.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +32,8 @@ import kr.eodiga.wayfinder.data.local.GuardianEntity
 import kr.eodiga.wayfinder.data.remote.ServiceKeyProvider
 import kr.eodiga.wayfinder.data.repository.PlaceRepository
 import kr.eodiga.wayfinder.domain.model.Place
+import kr.eodiga.wayfinder.service.VoiceCandidate
+import kr.eodiga.wayfinder.service.VoiceGuide
 import kr.eodiga.wayfinder.ui.components.InfoCard
 import kr.eodiga.wayfinder.ui.components.PrimaryActionButton
 import kr.eodiga.wayfinder.ui.components.ScreenTitle
@@ -46,7 +47,16 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val places: PlaceRepository,
     private val keys: ServiceKeyProvider,
+    voice: VoiceGuide,
 ) : ViewModel() {
+
+    /**
+     * 지금 이 기기가 잡은 안내 목소리.
+     *
+     * 기기마다 깔린 한국어 보이스가 달라 같은 앱이 다른 목소리로 말한다.
+     * "소리가 이상하다" 는 문의가 왔을 때 이 값이 없으면 재현할 방법이 없다.
+     */
+    val activeVoice: StateFlow<VoiceCandidate?> = voice.activeVoice
 
     val guardians: StateFlow<List<GuardianEntity>> = places.guardians()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -95,6 +105,7 @@ fun SettingsScreen(
 ) {
     val guardians by viewModel.guardians.collectAsStateWithLifecycle()
     val pinned by viewModel.pinned.collectAsStateWithLifecycle()
+    val activeVoice by viewModel.activeVoice.collectAsStateWithLifecycle()
 
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -121,6 +132,23 @@ fun SettingsScreen(
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (viewModel.isConfigured) EodigaColors.Success else EodigaColors.Danger,
+                )
+            }
+        }
+
+        item {
+            // 기기마다 잡히는 보이스가 달라 같은 앱이 다른 목소리로 말한다.
+            // 문의가 왔을 때 보호자가 이 화면을 읽어 전해줄 수 있어야 한다.
+            InfoCard(borderColor = EodigaColors.Muted) {
+                Text("안내 목소리", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    activeVoice?.name ?: "엔진 기본값",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    VoiceGuide.describeVoice(activeVoice),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = EodigaColors.Muted,
                 )
             }
         }

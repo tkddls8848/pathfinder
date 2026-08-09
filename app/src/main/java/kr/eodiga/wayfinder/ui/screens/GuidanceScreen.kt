@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import kr.eodiga.wayfinder.ui.components.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -23,6 +23,7 @@ import kr.eodiga.wayfinder.domain.model.GuidanceStage
 import kr.eodiga.wayfinder.domain.model.Journey
 import kr.eodiga.wayfinder.domain.model.JourneyLeg
 import kr.eodiga.wayfinder.service.JourneyState
+import kr.eodiga.wayfinder.service.VoiceGuide
 import kr.eodiga.wayfinder.ui.components.BusNumberTag
 import kr.eodiga.wayfinder.ui.components.HeroNumber
 import kr.eodiga.wayfinder.ui.components.InfoCard
@@ -119,7 +120,8 @@ private fun StageContent(
             HeroNumber(
                 value = "${stage.remainingMeters.toSteps()}",
                 unit = "걸음",
-                spokenLabel = "약 ${stage.remainingMeters.toSteps()}걸음 남았습니다",
+                // 눈으로는 숫자를, 귀로는 수사를. 화면의 "150" 을 톡백이 "백오십 걸음" 으로 읽는다.
+                spokenLabel = "${VoiceGuide.distanceToSpeech(stage.remainingMeters)} 남았어요",
             )
             InfoCard {
                 Text(
@@ -162,7 +164,7 @@ private fun StageContent(
             PrimaryActionButton(
                 text = "네, 여기예요",
                 onClick = onConfirmAtStop,
-                spokenLabel = "네, 여기가 맞습니다",
+                spokenLabel = "네, 여기가 맞아요",
             )
         }
 
@@ -204,7 +206,8 @@ private fun StageContent(
                     HeroNumber(
                         value = "${arrival.arrivalMinutes}",
                         unit = "분 뒤 도착",
-                        spokenLabel = "${arrival.arrivalMinutes}분 뒤에 도착합니다",
+                        // 분은 한자어 단위라 "삼 분" 이 맞다. 수사를 바꾸지 않는다.
+                        spokenLabel = "${arrival.arrivalMinutes}분 뒤에 와요",
                     )
                     if (arrival.isLowFloor) {
                         InfoCard(borderColor = EodigaColors.Success) {
@@ -265,7 +268,7 @@ private fun StageContent(
             HeroNumber(
                 value = "${stage.stopsRemaining}",
                 unit = "정거장",
-                spokenLabel = "${stage.stopsRemaining}정거장 남았습니다",
+                spokenLabel = "${VoiceGuide.stopCountToSpeech(stage.stopsRemaining)} 남았어요",
             )
             InfoCard {
                 Text("다음 정류장", style = MaterialTheme.typography.bodyMedium, color = EodigaColors.Muted)

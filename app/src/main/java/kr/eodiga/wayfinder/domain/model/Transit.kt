@@ -5,15 +5,12 @@ package kr.eodiga.wayfinder.domain.model
  *
  * @param cityCode TAGO 도시코드. 도착정보/노선정보 조회에 반드시 함께 보내야 한다.
  * @param nodeId   정류소 ID (예: DJB8001793). 도착정보 조회 키.
- * @param nodeNo   정류소 번호 (예: 42381). 어르신이 정류장 기둥에서 눈으로 확인하는 번호.
  */
 data class BusStop(
     val cityCode: Int,
     val nodeId: String,
-    val nodeNo: String?,
     val name: String,
     val location: LatLng,
-    val direction: String? = null,
 )
 
 /** 노선 종류. TAGO routeTp 문자열을 정규화한 것. */
@@ -48,8 +45,6 @@ data class BusRoute(
     val routeId: String,
     val routeNo: String,
     val kind: BusKind = BusKind.UNKNOWN,
-    val startStopName: String? = null,
-    val endStopName: String? = null,
 )
 
 /**
@@ -57,14 +52,9 @@ data class BusRoute(
  * TAGO `ArvlInfoInqireService.getSttnAcctoArvlPrearngeInfoList` 응답 1건.
  *
  * @param arrivalSeconds arrtime(초). 0 이하이면 "곧 도착".
- * @param stopsAway      arrprevstationcnt. 남은 정거장 수.
  */
 data class BusArrival(
-    val routeId: String,
-    val routeNo: String,
-    val kind: BusKind,
     val arrivalSeconds: Int,
-    val stopsAway: Int,
     val vehicleType: String? = null,
 ) {
     val arrivalMinutes: Int get() = (arrivalSeconds / 60).coerceAtLeast(0)
@@ -80,7 +70,6 @@ data class BusArrival(
 data class RouteStop(
     val order: Int,
     val nodeId: String,
-    val nodeNo: String?,
     val name: String,
     val location: LatLng,
 )

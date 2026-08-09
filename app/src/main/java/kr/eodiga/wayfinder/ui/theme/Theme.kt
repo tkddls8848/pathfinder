@@ -6,8 +6,6 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -122,18 +120,14 @@ object EodigaDimens {
     val CornerRadius = 16.dp
 }
 
-val LocalEodigaDimens = staticCompositionLocalOf { EodigaDimens }
-
 @Composable
 fun EodigaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    CompositionLocalProvider(LocalEodigaDimens provides EodigaDimens) {
-        MaterialTheme(
-            colorScheme = if (darkTheme) DarkScheme else LightScheme,
-            typography = EodigaTypography,
-            content = content,
-        )
-    }
+    MaterialTheme(
+        colorScheme = if (darkTheme) DarkScheme else LightScheme,
+        typography = EodigaTypography,
+        content = content,
+    )
 }

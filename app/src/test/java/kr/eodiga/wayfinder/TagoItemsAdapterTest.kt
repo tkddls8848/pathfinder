@@ -42,9 +42,6 @@ class TagoItemsAdapterTest {
 
         assertEquals(2, items.size)
         assertEquals("중앙시장", items[0].nodeName)
-        // nodeno 가 숫자로 와도 문자열로 정규화된다.
-        assertEquals("42381", items[0].nodeNo)
-        assertEquals("42382", items[1].nodeNo)
     }
 
     @Test

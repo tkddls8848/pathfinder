@@ -26,8 +26,6 @@ class ServiceKeyProvider @Inject constructor() {
 
     val jusoKey: String = BuildConfig.JUSO_CONFIRM_KEY.trim()
 
-    val seoulKey: String = BuildConfig.SEOUL_OPEN_API_KEY.trim()
-
     val hasServiceKey: Boolean get() = serviceKey.isNotBlank()
 
     private fun normalize(raw: String): String {

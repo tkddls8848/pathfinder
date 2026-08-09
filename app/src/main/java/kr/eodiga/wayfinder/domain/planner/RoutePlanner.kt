@@ -210,7 +210,6 @@ class RoutePlanner @Inject constructor(
                 val transferStop = BusStop(
                     cityCode = routeA.cityCode,
                     nodeId = transferOnA.nodeId,
-                    nodeNo = transferOnA.nodeNo,
                     name = transferOnA.name,
                     location = transferOnA.location,
                 )
@@ -244,7 +243,6 @@ class RoutePlanner @Inject constructor(
             // 환승 구간에서 같은 정류소면 도보 구간을 만들지 않는다.
             if (index == 0 || walkMeters > 20) {
                 legs += JourneyLeg.Walk(
-                    from = cursor,
                     to = spec.boardStop.location,
                     distanceMeters = walkMeters.toInt(),
                     destinationName = spec.boardStop.name,
@@ -265,22 +263,19 @@ class RoutePlanner @Inject constructor(
 
         val finalWalk = Geo.distanceMeters(cursor, destination.location)
         legs += JourneyLeg.Walk(
-            from = cursor,
             to = destination.location,
             distanceMeters = finalWalk.toInt(),
             destinationName = destination.name,
             durationMinutes = Geo.walkMinutes(finalWalk),
         )
 
-        return Journey(origin = origin, destination = destination, legs = legs)
+        return Journey(destination = destination, legs = legs)
     }
 
     private fun walkOnlyJourney(origin: LatLng, destination: Place, meters: Double) = Journey(
-        origin = origin,
         destination = destination,
         legs = listOf(
             JourneyLeg.Walk(
-                from = origin,
                 to = destination.location,
                 distanceMeters = meters.toInt(),
                 destinationName = destination.name,

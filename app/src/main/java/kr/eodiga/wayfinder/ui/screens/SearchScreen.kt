@@ -3,16 +3,27 @@ package kr.eodiga.wayfinder.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.item
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
+import kr.eodiga.wayfinder.ui.components.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kr.eodiga.wayfinder.BuildConfig
+import kr.eodiga.wayfinder.ui.components.InfoCard
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,7 +36,9 @@ import kotlinx.coroutines.launch
 import kr.eodiga.wayfinder.core.FailureReason
 import kr.eodiga.wayfinder.core.Outcome
 import kr.eodiga.wayfinder.data.repository.PlaceRepository
+import kr.eodiga.wayfinder.domain.model.LatLng
 import kr.eodiga.wayfinder.domain.model.Place
+import kr.eodiga.wayfinder.domain.model.PlaceKind
 import kr.eodiga.wayfinder.location.LocationProvider
 import kr.eodiga.wayfinder.location.RegionResolver
 import kr.eodiga.wayfinder.ui.nav.NavigationStore
@@ -156,6 +169,17 @@ fun SearchScreen(
             )
         }
 
+        // 에뮬레이터에는 마이크가 없어 음성 입력만으로는 이 화면을 넘어갈 수 없다.
+        // 디버그 빌드에만 나오고, 릴리스 APK 에는 아예 컴파일되지 않는다.
+        if (BuildConfig.DEBUG) {
+            item {
+                DeveloperSearchField(
+                    onSearch = viewModel::search,
+                    onPickSample = onPlaceSelected,
+                )
+            }
+        }
+
         if (state.query.isNotBlank()) {
             item {
                 Text(
@@ -212,3 +236,90 @@ fun SearchScreen(
         item { SecondaryActionButton(text = "뒤로", onClick = onBack) }
     }
 }
+
+/**
+ * 개발용 목적지 입력.
+ *
+ * 어르신에게 한글 키보드는 가장 큰 장벽이라 이 앱은 키보드 입력을 쓰지 않는다.
+ * 그러나 에뮬레이터에는 마이크가 없어, 개발 중에는 음성 화면을 통과할 방법이 아예 없다.
+ *
+ * "넘기기" 버튼이 아니라 **입력칸**인 이유는, 건너뛰면 정작 확인해야 할 것이
+ * 확인되지 않기 때문이다. 이 칸은 음성 결과와 똑같이 [SearchViewModel.search] 로
+ * 들어가므로 공공데이터 조회·경로 탐색까지 실제 경로를 그대로 탄다.
+ *
+ * `BuildConfig.DEBUG` 가 상수라 릴리스 빌드에서는 호출부째로 제거된다.
+ */
+@Composable
+private fun DeveloperSearchField(
+    onSearch: (String) -> Unit,
+    onPickSample: (Place) -> Unit,
+) {
+    var typed by remember { mutableStateOf("") }
+
+    InfoCard(borderColor = EodigaColors.Muted) {
+        Text(
+            "개발용 입력 — 디버그 빌드에만 나옵니다",
+            style = MaterialTheme.typography.bodyMedium,
+            color = EodigaColors.Muted,
+        )
+        OutlinedTextField(
+            value = typed,
+            onValueChange = { typed = it },
+            label = { Text("예: 국립중앙의료원") },
+            singleLine = true,
+            textStyle = TextStyle(fontSize = 22.sp),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearch(typed) }),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        SecondaryActionButton(text = "찾기", onClick = { onSearch(typed) })
+
+        // 에뮬레이터는 기본 IME 가 영문뿐이라 한글을 치려면 언어를 따로 추가해야 한다.
+        // 한 번에 누를 수 있는 표본을 둔다.
+        Text(
+            "검색을 건너뛰고 바로 목적지로",
+            style = MaterialTheme.typography.bodyMedium,
+            color = EodigaColors.Muted,
+        )
+        DEVELOPER_DESTINATIONS.forEach { place ->
+            SecondaryActionButton(
+                text = "${place.name} · ${place.address}",
+                onClick = { onPickSample(place) },
+            )
+        }
+    }
+}
+
+/**
+ * 검색을 건너뛰고 바로 쓸 목적지.
+ *
+ * 검색이 막혀 있어서 둔 것이다. 병·의원 API 는 한글 필터를 넣으면 0건을 내고
+ * (인코딩을 넷으로 바꿔 봐도 같다), 주소검색은 `JUSO_CONFIRM_KEY` 가 있어야 한다.
+ * 그 둘이 풀리기 전까지 이 앱의 본체 — 정류소 탐색·경로 계산·하차 알림 — 을
+ * 시험할 방법이 없다. 목적지만 넣어 주면 그 뒤는 전부 실제 공공데이터로 돈다.
+ *
+ * **좌표가 대전인 이유가 있다.** TAGO 정류소정보에 서울 데이터가 없다.
+ * 같은 API 로 대전·부산·수원은 정류소가 나오는데 서울만 0건이다.
+ * 서울은 자체 API 를 쓰는데 이 앱에는 붙어 있지 않다 — 4절 #15.
+ */
+private val DEVELOPER_DESTINATIONS = listOf(
+    Place(
+        id = "dev-daejeon-cityhall",
+        name = "대전시청",
+        address = "대전 서구 둔산로 100",
+        location = LatLng(36.3504, 127.3845),
+    ),
+    Place(
+        id = "dev-daejeon-station",
+        name = "대전역",
+        address = "대전 동구 중앙로 215",
+        location = LatLng(36.3315, 127.4342),
+    ),
+    Place(
+        id = "dev-chungnam-hospital",
+        name = "충남대학교병원",
+        address = "대전 중구 문화로 282",
+        location = LatLng(36.3170, 127.4145),
+        kind = PlaceKind.HOSPITAL,
+    ),
+)

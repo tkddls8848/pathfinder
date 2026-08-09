@@ -19,4 +19,3 @@ JUSO_CONFIRM_KEY=
 
 # ── 서울 열린데이터광장 (data.seoul.go.kr) ───────────────────
 # 지하철 실시간 도착정보용. 없으면 지하철 실시간 도착만 비활성화됩니다.
-SEOUL_OPEN_API_KEY=

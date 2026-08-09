@@ -1,7 +1,6 @@
 package kr.eodiga.wayfinder.domain.model
 
 import kotlin.math.asin
-import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -23,16 +22,6 @@ object Geo {
         val lat2 = Math.toRadians(b.lat)
         val h = sin(dLat / 2).let { it * it } + cos(lat1) * cos(lat2) * sin(dLng / 2).let { it * it }
         return 2 * EARTH_RADIUS_M * asin(sqrt(h.coerceIn(0.0, 1.0)))
-    }
-
-    /** 정북 기준 시계방향 방위각(0~360). 도보 안내에서 회전 방향을 만들 때 쓴다. */
-    fun bearingDegrees(from: LatLng, to: LatLng): Double {
-        val lat1 = Math.toRadians(from.lat)
-        val lat2 = Math.toRadians(to.lat)
-        val dLng = Math.toRadians(to.lng - from.lng)
-        val y = sin(dLng) * cos(lat2)
-        val x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLng)
-        return (Math.toDegrees(atan2(y, x)) + 360.0) % 360.0
     }
 
     /**

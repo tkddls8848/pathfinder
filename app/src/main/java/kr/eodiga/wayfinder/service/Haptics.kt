@@ -39,11 +39,6 @@ class Haptics @Inject constructor(
     private fun vibrate(pattern: LongArray) {
         val v = vibrator ?: return
         if (!v.hasVibrator()) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            v.vibrate(VibrationEffect.createWaveform(pattern, -1))
-        } else {
-            @Suppress("DEPRECATION")
-            v.vibrate(pattern, -1)
-        }
+        v.vibrate(VibrationEffect.createWaveform(pattern, -1))
     }
 }

@@ -26,9 +26,15 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    private const val TAGO_BASE = "https://apis.data.go.kr/1613000/"
-    private const val DATA_GO_KR_BASE = "https://apis.data.go.kr/"
-    private const val WEATHER_BASE = "https://apis.data.go.kr/1360000/"
+    /*
+     * 공공데이터포털은 호스트가 같고 **기관코드로 서비스를 가른다.**
+     * 그래서 베이스 URL 에서 기관코드가 빠지면 인증 오류가 아니라
+     * `NO_OPENAPI_SERVICE_ERROR`("해당 오픈API 서비스가 없거나 폐기됨") 가 돌아온다.
+     * 키 문제로 착각하기 쉬우니 상수 이름에 어느 서비스인지 남긴다.
+     */
+    private const val TAGO_BASE = "https://apis.data.go.kr/1613000/"        // 국토교통부 TAGO
+    private const val HOSPITAL_BASE = "https://apis.data.go.kr/B552657/"    // 국립중앙의료원
+    private const val WEATHER_BASE = "https://apis.data.go.kr/1360000/"     // 기상청
     private const val JUSO_BASE = "https://business.juso.go.kr/addrlink/"
 
     /** 모든 DTO 가 @JsonClass(generateAdapter = true) 이므로 리플렉션 어댑터는 쓰지 않는다. */
@@ -55,15 +61,35 @@ object NetworkModule {
         .apply {
             if (BuildConfig.DEBUG) {
                 addInterceptor(
-                    HttpLoggingInterceptor().apply {
+                    HttpLoggingInterceptor(RedactingLogger).apply {
                         level = HttpLoggingInterceptor.Level.BASIC
-                        // 인증키가 로그에 남지 않도록 마스킹한다.
-                        redactQueryParams("serviceKey", "confmKey", "KEY")
                     },
                 )
             }
         }
         .build()
+
+    /**
+     * 인증키가 로그에 남지 않게 지운다.
+     *
+     * OkHttp 는 헤더만 가려주고(`redactHeader`) 쿼리 문자열은 그대로 찍는다.
+     * 그런데 공공데이터포털은 인증키를 **쿼리로** 받는다. BASIC 레벨도 요청 줄에
+     * 전체 URL 을 남기므로, 아무것도 하지 않으면 디버그 로그에 키가 통째로 찍힌다.
+     * 로그캣은 다른 앱도 읽을 수 있던 시절의 습관이 남아 캡처가 쉽게 돌아다닌다.
+     */
+    private object RedactingLogger : HttpLoggingInterceptor.Logger {
+
+        private val secret = Regex(
+            "(?<=[?&])(serviceKey|confmKey|KEY)=[^&\\s]*",
+            RegexOption.IGNORE_CASE,
+        )
+
+        override fun log(message: String) {
+            HttpLoggingInterceptor.Logger.DEFAULT.log(
+                secret.replace(message) { "${it.groupValues[1]}=***" },
+            )
+        }
+    }
 
     private fun retrofit(base: String, client: OkHttpClient, moshi: Moshi): Retrofit =
         Retrofit.Builder()
@@ -75,8 +101,8 @@ object NetworkModule {
     @Provides @Singleton @Named("tago")
     fun tagoRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit = retrofit(TAGO_BASE, client, moshi)
 
-    @Provides @Singleton @Named("datagokr")
-    fun dataGoKrRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit = retrofit(DATA_GO_KR_BASE, client, moshi)
+    @Provides @Singleton @Named("hospital")
+    fun hospitalRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit = retrofit(HOSPITAL_BASE, client, moshi)
 
     @Provides @Singleton @Named("weather")
     fun weatherRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit = retrofit(WEATHER_BASE, client, moshi)
@@ -107,7 +133,7 @@ object NetworkModule {
     fun busLocationApi(@Named("tago") r: Retrofit): TagoBusLocationApi = r.create(TagoBusLocationApi::class.java)
 
     @Provides @Singleton
-    fun hospitalApi(@Named("datagokr") r: Retrofit): HospitalApi = r.create(HospitalApi::class.java)
+    fun hospitalApi(@Named("hospital") r: Retrofit): HospitalApi = r.create(HospitalApi::class.java)
 
     @Provides @Singleton
     fun weatherApi(@Named("weather") r: Retrofit): kr.eodiga.wayfinder.data.remote.api.WeatherApi =

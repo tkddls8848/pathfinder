@@ -38,8 +38,6 @@ android {
 
         buildConfigField("String", "PUBLIC_DATA_SERVICE_KEY", "\"${secret("PUBLIC_DATA_SERVICE_KEY")}\"")
         buildConfigField("String", "JUSO_CONFIRM_KEY", "\"${secret("JUSO_CONFIRM_KEY")}\"")
-        buildConfigField("String", "SEOUL_OPEN_API_KEY", "\"${secret("SEOUL_OPEN_API_KEY")}\"")
-
         resourceConfigurations += listOf("ko")
     }
 
@@ -91,11 +89,8 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
-    debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)
@@ -111,15 +106,10 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-    implementation(libs.androidx.datastore.preferences)
-
     implementation(libs.play.services.location)
-    implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
-    testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.okhttp.mockwebserver)
 }
