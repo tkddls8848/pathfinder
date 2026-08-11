@@ -1,0 +1,55 @@
+name: 디버그 APK 빌드
+
+# 폰만 있고 PC 가 없을 때 APK 를 받는 경로.
+# Actions 탭에서 직접 실행하거나, 이 브랜치에 푸시하면 자동으로 돕니다.
+# 결과물은 실행 요약 화면 하단 Artifacts 에 zip 으로 붙습니다.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17 준비
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle 준비
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Android SDK 구성요소 확인
+        # 러너 이미지에 대개 이미 있지만, 이미지 개편으로 빠지는 일이 있어 명시한다.
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+
+      - name: 단위 테스트
+        run: ./gradlew test --stacktrace
+
+      - name: 디버그 APK 빌드
+        env:
+          # Settings > Secrets and variables > Actions 에 등록한 값.
+          # 없으면 빈 문자열로 빌드되고, 앱은 실행 시 "인증키 없음" 을 화면에 알린다.
+          PUBLIC_DATA_SERVICE_KEY: ${{ secrets.PUBLIC_DATA_SERVICE_KEY }}
+          JUSO_CONFIRM_KEY: ${{ secrets.JUSO_CONFIRM_KEY }}
+          SEOUL_OPEN_API_KEY: ${{ secrets.SEOUL_OPEN_API_KEY }}
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: APK 올리기
+        uses: actions/upload-artifact@v4
+        with:
+          name: eodiga-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14

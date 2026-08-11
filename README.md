@@ -105,6 +105,10 @@ JUSO_CONFIRM_KEY=주소검색_승인키   # 선택
 
 **요구사항**: JDK 17, Android SDK 35, minSdk 26 (Android 8.0)
 
+> **PC 가 없다면** — 저장소 Actions 탭의 "디버그 APK 빌드" 를 실행하면
+> GitHub 이 대신 빌드해 APK 를 Artifacts 로 올려줍니다. 폰에서 받아 설치할 수 있습니다.
+> 인증키 등록부터 설치·권한 설정까지 [`docs/install.md`](docs/install.md) 에 정리해 두었습니다.
+
 ### 4. 첫 실행
 
 1. 위치·알림 권한 허용
