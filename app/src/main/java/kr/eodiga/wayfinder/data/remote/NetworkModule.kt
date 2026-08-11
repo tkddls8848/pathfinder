@@ -22,6 +22,22 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
 
+/**
+ * BASIC 레벨은 요청 URL 을 통째로 찍는다. 공공데이터포털은 인증키를 쿼리
+ * 파라미터로 받으므로 그대로 두면 인증키가 로그에 남는다.
+ *
+ * OkHttp 4 의 [HttpLoggingInterceptor] 에는 쿼리 파라미터 마스킹이 없다
+ * (`redactQueryParams` 는 OkHttp 5 부터다). 헤더용 `redactHeader` 로는
+ * 가릴 수 없으므로 로거 단에서 값만 지운다.
+ */
+private val SECRET_QUERY_PARAM = Regex(
+    """([?&](?:serviceKey|confmKey|key)=)[^&\s]*""",
+    RegexOption.IGNORE_CASE,
+)
+
+internal fun redactSecrets(message: String): String =
+    SECRET_QUERY_PARAM.replace(message) { "${it.groupValues[1]}<redacted>" }
+
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
@@ -55,10 +71,10 @@ object NetworkModule {
         .apply {
             if (BuildConfig.DEBUG) {
                 addInterceptor(
-                    HttpLoggingInterceptor().apply {
+                    HttpLoggingInterceptor { message ->
+                        HttpLoggingInterceptor.Logger.DEFAULT.log(redactSecrets(message))
+                    }.apply {
                         level = HttpLoggingInterceptor.Level.BASIC
-                        // 인증키가 로그에 남지 않도록 마스킹한다.
-                        redactQueryParams("serviceKey", "confmKey", "KEY")
                     },
                 )
             }
