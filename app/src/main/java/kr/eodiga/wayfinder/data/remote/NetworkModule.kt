@@ -22,6 +22,22 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
 
+/**
+ * BASIC 레벨은 요청 URL 을 통째로 찍는다. 공공데이터포털은 인증키를 쿼리
+ * 파라미터로 받으므로 그대로 두면 인증키가 로그에 남는다.
+ *
+ * OkHttp 4 의 [HttpLoggingInterceptor] 에는 쿼리 파라미터 마스킹이 없다
+ * (`redactQueryParams` 는 OkHttp 5 부터다). 헤더용 `redactHeader` 로는
+ * 가릴 수 없으므로 로거 단에서 값만 지운다.
+ */
+private val SECRET_QUERY_PARAM = Regex(
+    """([?&](?:serviceKey|confmKey|key)=)[^&\s]*""",
+    RegexOption.IGNORE_CASE,
+)
+
+internal fun redactSecrets(message: String): String =
+    SECRET_QUERY_PARAM.replace(message) { "${it.groupValues[1]}<redacted>" }
+
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
@@ -61,35 +77,15 @@ object NetworkModule {
         .apply {
             if (BuildConfig.DEBUG) {
                 addInterceptor(
-                    HttpLoggingInterceptor(RedactingLogger).apply {
+                    HttpLoggingInterceptor { message ->
+                        HttpLoggingInterceptor.Logger.DEFAULT.log(redactSecrets(message))
+                    }.apply {
                         level = HttpLoggingInterceptor.Level.BASIC
                     },
                 )
             }
         }
         .build()
-
-    /**
-     * 인증키가 로그에 남지 않게 지운다.
-     *
-     * OkHttp 는 헤더만 가려주고(`redactHeader`) 쿼리 문자열은 그대로 찍는다.
-     * 그런데 공공데이터포털은 인증키를 **쿼리로** 받는다. BASIC 레벨도 요청 줄에
-     * 전체 URL 을 남기므로, 아무것도 하지 않으면 디버그 로그에 키가 통째로 찍힌다.
-     * 로그캣은 다른 앱도 읽을 수 있던 시절의 습관이 남아 캡처가 쉽게 돌아다닌다.
-     */
-    private object RedactingLogger : HttpLoggingInterceptor.Logger {
-
-        private val secret = Regex(
-            "(?<=[?&])(serviceKey|confmKey|KEY)=[^&\\s]*",
-            RegexOption.IGNORE_CASE,
-        )
-
-        override fun log(message: String) {
-            HttpLoggingInterceptor.Logger.DEFAULT.log(
-                secret.replace(message) { "${it.groupValues[1]}=***" },
-            )
-        }
-    }
 
     private fun retrofit(base: String, client: OkHttpClient, moshi: Moshi): Retrofit =
         Retrofit.Builder()
