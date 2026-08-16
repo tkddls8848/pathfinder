@@ -60,6 +60,24 @@ sealed interface GuidanceStage {
     data class WaitingForBus(override val legIndex: Int, val arrival: BusArrival?) : GuidanceStage
     data class Boarding(override val legIndex: Int) : GuidanceStage
     data class Riding(override val legIndex: Int, val stopsRemaining: Int, val nextStopName: String?) : GuidanceStage
+
+    /**
+     * 타고는 있으나 어느 차량인지 실시간 위치 데이터로 확정하지 못한 상태.
+     *
+     * 승차 지점 근처에 같은 노선 차량이 둘 이상이면 추적을 포기한다
+     * ([kr.eodiga.wayfinder.data.repository.TransitRepository.stopsRemaining]).
+     * 엉뚱한 차량을 따라가 한 정거장 일찍 내리게 하는 것보다 낫기 때문이다.
+     *
+     * 문제는 그 다음이다. 알림을 못 주게 됐다는 사실을 말하지 않으면
+     * 어르신은 "내릴 때가 되면 알려준다"는 앞선 약속을 믿고 앉아 있는다.
+     * 그래서 이 단계를 따로 두어, 안내를 줄 수 없다는 것과
+     * 내릴 정류장 이름을 화면과 음성으로 분명히 남긴다.
+     */
+    data class RidingUnknownVehicle(
+        override val legIndex: Int,
+        val alightStopName: String,
+    ) : GuidanceStage
+
     data class PrepareToAlight(override val legIndex: Int, val stopsRemaining: Int) : GuidanceStage
     data class RingBell(override val legIndex: Int) : GuidanceStage
     data object Arrived : GuidanceStage {

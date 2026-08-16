@@ -59,6 +59,13 @@ class JourneyController @Inject constructor(
 
         /** 이 정거장 수부터 "벨을 누르세요". */
         const val BELL_STOPS = 1
+
+        /**
+         * 탄 차량을 이 횟수만큼 연달아 못 찾으면 "안내를 줄 수 없다" 고 알린다.
+         * 한 번은 응답에서 잠깐 빠진 것일 수 있어 곧바로 놀라게 하지 않는다.
+         * 폴링 간격이 15초이므로 두 번이면 30초 안에는 알게 된다.
+         */
+        const val UNKNOWN_VEHICLE_POLLS_BEFORE_NOTICE = 2
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -203,18 +210,9 @@ class JourneyController @Inject constructor(
                         )
                     }
                     if (arrival != null && arrival.isImminent) {
-                        val boardOrder = leg.intermediateStops.firstOrNull()?.order
-                        val alightOrder = leg.intermediateStops.lastOrNull()?.order
-                        if (boardOrder != null && alightOrder != null) {
-                            // 도착 임박 시점에 승차 정류장 근처의 유일한 차량을 잡아 둔다.
-                            // 이후에는 이 번호만 추적하며, 사라져도 다른 차량으로 바꾸지 않는다.
-                            boardedVehicleNo = transit.stopsRemaining(
-                                route = leg.route,
-                                boardOrder = boardOrder,
-                                alightOrder = alightOrder,
-                                vehicleNo = null,
-                            ).getOrNull()?.vehicleNo
-                        }
+                        // 알림이 먼저다. 차량 특정은 네트워크 호출이라 재시도까지 겹치면
+                        // 수십 초가 걸릴 수 있는데, 버스는 60초 안에 온다. 이 뒤에 세우면
+                        // 버스가 지나간 다음 "손을 드세요" 가 나가게 된다.
                         haptics.busApproaching()
                         voice.speak(
                             // "손을 드세요" 는 몇 초 안에 해야 하는 동작이라 명령형을 남긴다.
@@ -222,6 +220,21 @@ class JourneyController @Inject constructor(
                             priority = Priority.CRITICAL,
                         )
                         transitionTo(GuidanceStage.Boarding(legIndex))
+
+                        // 어르신이 "네, 탔어요" 를 누르기까지 최소 몇 초는 걸린다.
+                        // 그 사이에 승차 정류장 근처의 유일한 차량을 잡아 둔다.
+                        // 이후에는 이 번호만 추적하며, 사라져도 다른 차량으로 바꾸지 않는다.
+                        // 여기서 취소되면(먼저 누른 경우) 추적 스트림이 스스로 다시 찾는다.
+                        val boardOrder = leg.intermediateStops.firstOrNull()?.order
+                        val alightOrder = leg.intermediateStops.lastOrNull()?.order
+                        if (boardOrder != null && alightOrder != null) {
+                            boardedVehicleNo = transit.stopsRemaining(
+                                route = leg.route,
+                                boardOrder = boardOrder,
+                                alightOrder = alightOrder,
+                                vehicleNo = null,
+                            ).getOrNull()?.vehicleNo
+                        }
                         // 버스가 도착했으므로 폴링을 멈춘다. 계속 두면 8초마다 진동이
                         // 다시 울리고, 도착정보 API 할당량도 낭비된다.
                         cancel()
@@ -245,13 +258,39 @@ class JourneyController @Inject constructor(
         val alightOrder = leg.intermediateStops.lastOrNull()?.order ?: return
         var announcedPrepare = false
         var announcedBell = false
+        var unknownVehiclePolls = 0
 
         transit.progressStream(leg.route, boardOrder, alightOrder, boardedVehicleNo).collect { outcome ->
-            val progress = outcome.getOrNull()
-            if (progress == null) {
-                _state.update { it.copy(failure = (outcome as? Outcome.Failure)?.reason) }
+            if (outcome is Outcome.Failure) {
+                _state.update { it.copy(failure = outcome.reason) }
                 return@collect
             }
+            val progress = (outcome as Outcome.Success).value
+            if (progress == null) {
+                // 조회는 됐는데 탄 차량을 못 찾았다. 한 번쯤은 응답에서 잠깐 빠질 수
+                // 있으므로 바로 알리지 않고, 연달아 못 찾을 때만 안내한다.
+                // 여기서 아무 말도 하지 않으면 화면은 "내릴 때가 되면 크게 알려드릴게요"
+                // 를 띄운 채 멈춰 있고, 어르신은 오지 않을 알림을 믿고 앉아 있게 된다.
+                unknownVehiclePolls++
+                if (unknownVehiclePolls == UNKNOWN_VEHICLE_POLLS_BEFORE_NOTICE) {
+                    _state.update {
+                        it.copy(
+                            failure = null,
+                            stage = GuidanceStage.RidingUnknownVehicle(legIndex, leg.alightStop.name),
+                        )
+                    }
+                    voice.speak(
+                        "어느 버스인지 확인하지 못했어요. " +
+                            "${leg.alightStop.name}에서 내리시면 돼요. " +
+                            "기사님께 여쭤보셔도 좋아요.",
+                        priority = Priority.INTERRUPT,
+                        allowRepeat = true,
+                    )
+                }
+                return@collect
+            }
+            // 다시 찾았다. 다음에 또 놓치면 처음부터 센다.
+            unknownVehiclePolls = 0
             boardedVehicleNo = boardedVehicleNo ?: progress.vehicleNo
 
             val remaining = progress.stopsRemaining
@@ -366,6 +405,9 @@ class JourneyController @Inject constructor(
                 "${VoiceGuide.busNumberToSpeech(bus.route.routeNo)}번 버스에 타셨으면, 네 탔어요를 눌러 주세요."
             }
             is GuidanceStage.Riding -> "${VoiceGuide.stopCountToSpeech(stage.stopsRemaining)} 더 가면 내려요."
+            // 정거장 수를 말하지 않는다. 셀 수 없게 된 것이 이 단계의 내용이다.
+            is GuidanceStage.RidingUnknownVehicle ->
+                "어느 버스인지 확인하지 못했어요. ${stage.alightStopName}에서 내리시면 돼요."
             // 아래 셋은 긴급 안내라 명령형 그대로 둔다.
             is GuidanceStage.PrepareToAlight -> "곧 내립니다. 일어날 준비하세요."
             is GuidanceStage.RingBell -> "벨을 누르세요. 다음 정류장에서 내립니다."

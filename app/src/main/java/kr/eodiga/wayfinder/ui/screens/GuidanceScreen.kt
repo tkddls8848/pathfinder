@@ -286,6 +286,43 @@ private fun StageContent(
             }
         }
 
+        /* ⑨-b 타고는 있으나 어느 차량인지 확정하지 못함 */
+        is GuidanceStage.RidingUnknownVehicle -> {
+            Text(
+                "내리실 곳",
+                style = MaterialTheme.typography.headlineLarge,
+                color = textColor,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            // 정거장 수 대신 정류장 이름을 가장 크게 둔다. 알림을 줄 수 없게 된 이상
+            // 어르신이 스스로 확인할 수 있는 단서는 이름뿐이다.
+            Text(
+                stage.alightStopName,
+                style = MaterialTheme.typography.displayMedium,
+                color = textColor,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            InfoCard(borderColor = EodigaColors.Danger) {
+                Text(
+                    "어느 버스에 타셨는지\n확인하지 못했습니다.",
+                    style = MaterialTheme.typography.headlineMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "내릴 때를 알려드릴 수 없어요.\n기사님께 ${stage.alightStopName}에서\n" +
+                        "내린다고 말씀해 주세요.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            SecondaryActionButton(text = "다시 들려주세요", onClick = onRepeat)
+            PrimaryActionButton(text = "내렸어요", onClick = onConfirmAlighted)
+        }
+
         /* ⑩ 하차 준비 */
         is GuidanceStage.PrepareToAlight -> {
             Text(

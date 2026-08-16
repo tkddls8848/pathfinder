@@ -114,6 +114,9 @@ class JourneyGuidanceService : LifecycleService() {
             is GuidanceStage.Riding ->
                 "${stage.stopsRemaining}정거장 남았습니다" to
                     (stage.nextStopName?.let { "다음 정류장: $it" } ?: destination)
+            // 주머니 속에서 울릴 알림이 없다는 뜻이므로, 잠금화면에도 그대로 적는다.
+            is GuidanceStage.RidingUnknownVehicle ->
+                "${stage.alightStopName}에서 내리세요" to "버스를 확인하지 못해 알려드릴 수 없습니다"
             is GuidanceStage.PrepareToAlight ->
                 "곧 내립니다" to "일어날 준비하세요"
             is GuidanceStage.RingBell ->
