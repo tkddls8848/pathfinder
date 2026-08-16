@@ -203,6 +203,18 @@ class JourneyController @Inject constructor(
                         )
                     }
                     if (arrival != null && arrival.isImminent) {
+                        val boardOrder = leg.intermediateStops.firstOrNull()?.order
+                        val alightOrder = leg.intermediateStops.lastOrNull()?.order
+                        if (boardOrder != null && alightOrder != null) {
+                            // 도착 임박 시점에 승차 정류장 근처의 유일한 차량을 잡아 둔다.
+                            // 이후에는 이 번호만 추적하며, 사라져도 다른 차량으로 바꾸지 않는다.
+                            boardedVehicleNo = transit.stopsRemaining(
+                                route = leg.route,
+                                boardOrder = boardOrder,
+                                alightOrder = alightOrder,
+                                vehicleNo = null,
+                            ).getOrNull()?.vehicleNo
+                        }
                         haptics.busApproaching()
                         voice.speak(
                             // "손을 드세요" 는 몇 초 안에 해야 하는 동작이라 명령형을 남긴다.
@@ -229,11 +241,12 @@ class JourneyController @Inject constructor(
      * 하차 알림이 한 정거장이라도 빗나가면 어르신은 낯선 곳에 내리게 된다.
      */
     private suspend fun trackRide(legIndex: Int, leg: JourneyLeg.Bus) {
+        val boardOrder = leg.intermediateStops.firstOrNull()?.order ?: return
         val alightOrder = leg.intermediateStops.lastOrNull()?.order ?: return
         var announcedPrepare = false
         var announcedBell = false
 
-        transit.progressStream(leg.route, alightOrder, boardedVehicleNo).collect { outcome ->
+        transit.progressStream(leg.route, boardOrder, alightOrder, boardedVehicleNo).collect { outcome ->
             val progress = outcome.getOrNull()
             if (progress == null) {
                 _state.update { it.copy(failure = (outcome as? Outcome.Failure)?.reason) }

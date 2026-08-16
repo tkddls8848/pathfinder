@@ -9,10 +9,13 @@ import android.net.Uri
 import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kr.eodiga.wayfinder.data.repository.PlaceRepository
 import kr.eodiga.wayfinder.domain.model.LatLng
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.Date
+import java.util.Locale
 
 /**
  * "길을 잃었어요" 처리.
@@ -34,30 +37,64 @@ class GuardianNotifier @Inject constructor(
     private val places: PlaceRepository,
 ) {
 
-    data class Result(val smsSent: Boolean, val callStarted: Boolean, val guardianName: String?)
+    enum class SmsStatus {
+        /** SmsManager 가 전송 요청을 정상 접수했다. */
+        SENT,
+
+        /** 권한이 없어 내용이 채워진 문자 앱만 열었다. 사용자가 전송을 눌러야 한다. */
+        COMPOSER_OPENED,
+
+        FAILED,
+        NOT_ATTEMPTED,
+    }
+
+    data class Result(
+        val smsStatus: SmsStatus,
+        val callStarted: Boolean,
+        val guardianName: String?,
+        val locationIncluded: Boolean,
+        val guardianLookupFailed: Boolean = false,
+    ) {
+        val smsSent: Boolean get() = smsStatus == SmsStatus.SENT
+        val anyActionStarted: Boolean
+            get() = smsStatus == SmsStatus.SENT ||
+                smsStatus == SmsStatus.COMPOSER_OPENED ||
+                callStarted
+    }
 
     suspend fun notifyLost(location: LatLng?, addressText: String?): Result {
-        val guardian = places.primaryGuardian()
-            ?: return Result(smsSent = false, callStarted = false, guardianName = null)
+        val guardian = try {
+            places.primaryGuardian()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            return Result(
+                smsStatus = SmsStatus.NOT_ATTEMPTED,
+                callStarted = false,
+                guardianName = null,
+                locationIncluded = location != null,
+                guardianLookupFailed = true,
+            )
+        } ?: return Result(
+            smsStatus = SmsStatus.NOT_ATTEMPTED,
+            callStarted = false,
+            guardianName = null,
+            locationIncluded = location != null,
+        )
 
-        val message = buildMessage(location, addressText)
-        val smsSent = trySendSms(guardian.phone, message)
+        val message = buildLostMessage(location, addressText)
+        val smsStatus = trySendSms(guardian.phone, message)
         val callStarted = tryCall(guardian.phone)
 
-        return Result(smsSent, callStarted, guardian.name)
+        return Result(
+            smsStatus = smsStatus,
+            callStarted = callStarted,
+            guardianName = guardian.name,
+            locationIncluded = location != null,
+        )
     }
 
-    private fun buildMessage(location: LatLng?, addressText: String?): String = buildString {
-        append("[어디가요] 도움이 필요합니다.\n")
-        if (!addressText.isNullOrBlank()) append("현재 위치: $addressText\n")
-        if (location != null) {
-            // 어떤 지도 앱에서도 열리는 범용 좌표 링크.
-            append("지도: https://maps.google.com/?q=${location.lat},${location.lng}\n")
-        }
-        append("보낸 시각: ${java.text.SimpleDateFormat("M월 d일 HH시 mm분", java.util.Locale.KOREA).format(java.util.Date())}")
-    }
-
-    private fun trySendSms(phone: String, message: String): Boolean {
+    private fun trySendSms(phone: String, message: String): SmsStatus {
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) ==
             PackageManager.PERMISSION_GRANTED
         if (granted) {
@@ -66,7 +103,7 @@ class GuardianNotifier @Inject constructor(
                 // 좌표 링크가 붙으면 70자를 쉽게 넘어가므로 분할 전송한다.
                 val parts = manager.divideMessage(message)
                 manager.sendMultipartTextMessage(phone, null, parts, null, null)
-            }.onSuccess { return true }
+            }.onSuccess { return SmsStatus.SENT }
         }
         // 권한이 없으면 문자 앱을 대신 연다. 어르신이 전송 버튼만 누르면 된다.
         return runCatching {
@@ -76,8 +113,8 @@ class GuardianNotifier @Inject constructor(
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 },
             )
-            false
-        }.getOrDefault(false)
+            SmsStatus.COMPOSER_OPENED
+        }.getOrDefault(SmsStatus.FAILED)
     }
 
     private fun tryCall(phone: String): Boolean {
@@ -95,4 +132,19 @@ class GuardianNotifier @Inject constructor(
             false
         }
     }
+}
+
+/** 주소와 좌표를 모두 담아, 주소 변환이 실패해도 지도 링크는 남긴다. */
+internal fun buildLostMessage(
+    location: LatLng?,
+    addressText: String?,
+    sentAt: Date = Date(),
+): String = buildString {
+    append("[어디가요] 도움이 필요합니다.\n")
+    if (!addressText.isNullOrBlank()) append("현재 위치: $addressText\n")
+    if (location != null) {
+        // 어떤 지도 앱에서도 열리는 범용 좌표 링크.
+        append("지도: https://maps.google.com/?q=${location.lat},${location.lng}\n")
+    }
+    append("보낸 시각: ${java.text.SimpleDateFormat("M월 d일 HH시 mm분", Locale.KOREA).format(sentAt)}")
 }

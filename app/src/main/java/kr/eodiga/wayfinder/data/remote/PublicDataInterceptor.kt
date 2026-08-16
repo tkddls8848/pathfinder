@@ -2,6 +2,7 @@ package kr.eodiga.wayfinder.data.remote
 
 import okhttp3.Interceptor
 import okhttp3.Response
+import java.io.IOException
 import javax.inject.Inject
 
 /**
@@ -45,6 +46,6 @@ class MissingKeyGuardInterceptor @Inject constructor(
     }
 }
 
-class MissingServiceKeyException : RuntimeException(
+class MissingServiceKeyException : IOException(
     "공공데이터포털 인증키가 설정되지 않았습니다. local.properties 의 PUBLIC_DATA_SERVICE_KEY 를 확인하세요.",
 )

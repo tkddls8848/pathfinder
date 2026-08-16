@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.delay
+import kotlin.math.abs
 import kr.eodiga.wayfinder.core.Outcome
 import kr.eodiga.wayfinder.core.outcomeOf
 import kr.eodiga.wayfinder.core.retrying
@@ -37,6 +38,11 @@ class TransitRepository @Inject constructor(
     private val routeApi: TagoBusRouteApi,
     private val locationApi: TagoBusLocationApi,
 ) {
+
+    private companion object {
+        /** 승차 직후 위치 API 가 한두 정류장 늦게 갱신되는 경우만 허용한다. */
+        const val BOARDING_MATCH_TOLERANCE_STOPS = 2
+    }
 
     private val routeStopCache = mutableMapOf<String, List<RouteStop>>()
     private val stopRouteCache = mutableMapOf<String, List<BusRoute>>()
@@ -137,11 +143,14 @@ class TransitRepository @Inject constructor(
     /**
      * 승차 후 남은 정거장 수를 실시간 차량 위치로 계산한다.
      *
-     * @param vehicleNo 승차한 차량 번호를 알면 그 차량만 추적한다.
-     *                  모르면 하차 정류소 이전에서 가장 가까이 접근한 차량을 쓴다.
+     * @param boardOrder 승차 정류소 순번. 차량번호를 아직 모를 때 승차 지점 근처의
+     *                   차량만 최초 후보로 삼는 안전 경계다.
+     * @param vehicleNo 승차한 차량 번호를 알면 그 차량만 추적한다. 해당 차량이
+     *                  응답에서 사라져도 다른 차량으로 갈아타지 않는다.
      */
     suspend fun stopsRemaining(
         route: BusRoute,
+        boardOrder: Int,
         alightOrder: Int,
         vehicleNo: String?,
     ): Outcome<BusProgress?> = outcomeOf {
@@ -149,29 +158,50 @@ class TransitRepository @Inject constructor(
             locationApi.busesOnRoute(cityCode = route.cityCode, routeId = route.routeId)
                 .itemsOrThrow()
         }
-        val candidates = buses.filter { (it.nodeOrder ?: Int.MAX_VALUE) <= alightOrder }
+        val candidates = buses.mapNotNull { bus ->
+            val order = bus.nodeOrder ?: return@mapNotNull null
+            val number = bus.vehicleNo ?: return@mapNotNull null
+            if (order > alightOrder) return@mapNotNull null
+            BusProgress(
+                vehicleNo = number,
+                currentOrder = order,
+                stopsRemaining = alightOrder - order,
+            )
+        }
         val chosen = when {
-            vehicleNo != null -> buses.firstOrNull { it.vehicleNo == vehicleNo }
-            else -> candidates.maxByOrNull { it.nodeOrder ?: Int.MIN_VALUE }
+            vehicleNo != null -> candidates.firstOrNull { it.vehicleNo == vehicleNo }
+            else -> candidates
+                .filter { abs(it.currentOrder - boardOrder) <= BOARDING_MATCH_TOLERANCE_STOPS }
+                // 같은 노선 차량이 승차 지점 근처에 둘 이상이면 어느 차에 탔는지
+                // 데이터만으로 확정할 수 없다. 임의 선택은 잘못된 하차 알림보다 위험하다.
+                .singleOrNull()
         } ?: return@outcomeOf null
-
-        val order = chosen.nodeOrder ?: return@outcomeOf null
-        BusProgress(
-            vehicleNo = chosen.vehicleNo,
-            currentOrder = order,
-            stopsRemaining = (alightOrder - order).coerceAtLeast(0),
-        )
+        chosen
     }
 
     /** 위치 추적 스트림. 포그라운드 서비스에서 소비한다. */
     fun progressStream(
         route: BusRoute,
+        boardOrder: Int,
         alightOrder: Int,
         vehicleNo: String?,
         intervalMs: Long = 15_000,
     ): Flow<Outcome<BusProgress?>> = flow {
+        var trackedVehicleNo = vehicleNo
+        var mayDiscoverVehicle = vehicleNo == null
         while (true) {
-            emit(stopsRemaining(route, alightOrder, vehicleNo))
+            val result = if (trackedVehicleNo == null && !mayDiscoverVehicle) {
+                // 승차 직후의 첫 정상 응답에서 차량을 특정하지 못했다면 이후 도착한
+                // 다른 차량을 탑승 차량으로 오인하지 않는다.
+                Outcome.Success(null)
+            } else {
+                stopsRemaining(route, boardOrder, alightOrder, trackedVehicleNo)
+            }
+            if (result is Outcome.Success && trackedVehicleNo == null) {
+                mayDiscoverVehicle = false
+                result.value?.vehicleNo?.let { trackedVehicleNo = it }
+            }
+            emit(result)
             delay(intervalMs)
         }
     }.flowOn(Dispatchers.IO)
@@ -184,7 +214,7 @@ class TransitRepository @Inject constructor(
 
 /** 승차 중인 버스의 진행 상황. */
 data class BusProgress(
-    val vehicleNo: String?,
+    val vehicleNo: String,
     val currentOrder: Int,
     val stopsRemaining: Int,
 )

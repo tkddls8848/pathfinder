@@ -8,8 +8,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kr.eodiga.wayfinder.domain.model.LatLng
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
@@ -33,8 +35,7 @@ class RegionResolver @Inject constructor(
         if (Geocoder.isPresent()) Geocoder(context, Locale.KOREA) else null
 
     suspend fun resolve(at: LatLng): Region? {
-        val coder = geocoder ?: return null
-        val address = withContext(Dispatchers.IO) { firstAddress(coder, at) } ?: return null
+        val address = addressAt(at) ?: return null
 
         // adminArea = 시/도 (예: 서울특별시), subAdminArea 또는 locality = 시/군/구
         val sido = address.adminArea ?: return null
@@ -42,15 +43,71 @@ class RegionResolver @Inject constructor(
         return Region(sido = sido, sigungu = sigungu)
     }
 
+    /**
+     * 긴급 연락 화면에 표시하고 문자에 넣을 사람이 읽을 수 있는 주소.
+     * 역지오코딩이 실패해도 호출자는 좌표만으로 연락을 계속할 수 있다.
+     */
+    suspend fun resolveAddress(at: LatLng): String? {
+        val address = addressAt(at) ?: return null
+        return runCatching { address.getAddressLine(0) }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+            ?: listOfNotNull(
+                address.adminArea,
+                address.subAdminArea ?: address.locality,
+                address.thoroughfare,
+                address.featureName,
+            ).distinct().joinToString(" ").takeIf { it.isNotBlank() }
+    }
+
+    private suspend fun addressAt(at: LatLng): Address? {
+        val coder = geocoder ?: return null
+        return withContext(Dispatchers.IO) {
+            withTimeoutOrNull(GEOCODER_TIMEOUT_MS) { firstAddress(coder, at) }
+        }
+    }
+
     private suspend fun firstAddress(coder: Geocoder, at: LatLng): Address? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             suspendCancellableCoroutine { cont ->
-                coder.getFromLocation(at.lat, at.lng, 1) { list ->
-                    cont.resume(list.firstOrNull())
+                runCatching {
+                    coder.getFromLocation(
+                        at.lat,
+                        at.lng,
+                        1,
+                        FirstAddressListener { address ->
+                            if (cont.isActive) cont.resume(address)
+                        },
+                    )
+                }.onFailure {
+                    if (cont.isActive) cont.resume(null)
                 }
             }
         } else {
             @Suppress("DEPRECATION")
             runCatching { coder.getFromLocation(at.lat, at.lng, 1)?.firstOrNull() }.getOrNull()
         }
+
+    private companion object {
+        const val GEOCODER_TIMEOUT_MS = 5_000L
+    }
+}
+
+/** Android 13+ Geocoder 는 성공과 실패를 별도 콜백으로 보낸다. 둘 중 하나만 완료한다. */
+internal class FirstAddressListener(
+    private val complete: (Address?) -> Unit,
+) : Geocoder.GeocodeListener {
+    private val completed = AtomicBoolean(false)
+
+    override fun onGeocode(addresses: MutableList<Address>) {
+        completeOnce(addresses.firstOrNull())
+    }
+
+    override fun onError(errorMessage: String?) {
+        completeOnce(null)
+    }
+
+    private fun completeOnce(address: Address?) {
+        if (completed.compareAndSet(false, true)) complete(address)
+    }
 }
