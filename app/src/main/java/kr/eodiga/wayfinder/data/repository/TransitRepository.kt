@@ -21,6 +21,7 @@ import kr.eodiga.wayfinder.domain.model.BusStop
 import kr.eodiga.wayfinder.domain.model.Geo
 import kr.eodiga.wayfinder.domain.model.LatLng
 import kr.eodiga.wayfinder.domain.model.RouteStop
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -44,8 +45,13 @@ class TransitRepository @Inject constructor(
         const val BOARDING_MATCH_TOLERANCE_STOPS = 2
     }
 
-    private val routeStopCache = mutableMapOf<String, List<RouteStop>>()
-    private val stopRouteCache = mutableMapOf<String, List<BusRoute>>()
+    /**
+     * 경로 탐색은 정류소·노선 조회를 병렬로 띄운다([kr.eodiga.wayfinder.domain.planner.RoutePlanner]).
+     * 여러 IO 스레드가 동시에 써도 안전해야 하므로 동기화되는 맵을 쓴다.
+     * 일반 HashMap 이면 리사이즈가 겹칠 때 항목이 유실되거나 구조가 깨진다.
+     */
+    private val routeStopCache = ConcurrentHashMap<String, List<RouteStop>>()
+    private val stopRouteCache = ConcurrentHashMap<String, List<BusRoute>>()
 
     /** 현재 위치 주변 정류소. 가까운 순으로 정렬해서 돌려준다. */
     suspend fun nearbyStops(at: LatLng, limit: Int = 12): Outcome<List<BusStop>> = outcomeOf {
@@ -109,12 +115,18 @@ class TransitRepository @Inject constructor(
         stops
     }
 
-    /** 특정 노선 하나의 도착 예정. 대기 화면 폴링용. */
+    /**
+     * 특정 노선 하나의 도착 예정. 대기 화면 폴링용.
+     *
+     * arrtime 이 없는 레코드는 버린다. 예전에는 0 으로 채웠는데, 0 은
+     * [BusArrival.isImminent] 를 곧바로 참으로 만들어 "곧 와요, 손을 드세요" 가
+     * 나가버렸다. 오지 않는 버스에 손을 들게 하는 것보다 모른다고 하는 편이 낫다.
+     */
     suspend fun arrivalOf(stop: BusStop, routeId: String): Outcome<BusArrival?> = outcomeOf {
         retrying {
             arrivalApi.arrivalOfRoute(cityCode = stop.cityCode, nodeId = stop.nodeId, routeId = routeId)
                 .itemsOrThrow()
-                .map { it.toDomain() }
+                .mapNotNull { it.toDomainOrNull() }
                 .minByOrNull { it.arrivalSeconds }
         }
     }
@@ -206,10 +218,14 @@ class TransitRepository @Inject constructor(
         }
     }.flowOn(Dispatchers.IO)
 
-    private fun kr.eodiga.wayfinder.data.remote.dto.BusArrivalDto.toDomain() = BusArrival(
-        arrivalSeconds = arrivalSeconds ?: 0,
-        vehicleType = vehicleType,
-    )
+    private fun kr.eodiga.wayfinder.data.remote.dto.BusArrivalDto.toDomainOrNull(): BusArrival? =
+        arrivalSeconds?.let { seconds ->
+            BusArrival(
+                // 음수로 오는 지역이 있다. "이미 지나갔다" 는 뜻이라 0 으로 눌러 둔다.
+                arrivalSeconds = seconds.coerceAtLeast(0),
+                vehicleType = vehicleType,
+            )
+        }
 }
 
 /** 승차 중인 버스의 진행 상황. */

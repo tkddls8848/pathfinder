@@ -71,11 +71,27 @@ class JourneyGuidanceService : LifecycleService() {
             stopSelf()
             return START_NOT_STICKY
         }
-        // 안내 도중 프로세스가 죽으면 시스템이 되살리게 한다.
-        return START_STICKY
+        /*
+         * 되살리지 않는다.
+         *
+         * 안내 상태는 [JourneyController] 의 메모리에만 있다. 프로세스가 죽으면
+         * 그 상태도 함께 사라지므로, 시스템이 서비스만 되살려 봐야 복원할 것이
+         * 없다. START_STICKY 였을 때는 빈 상태로 되살아나 "길안내 준비 중"
+         * 알림이 지워지지 않은 채 영원히 남았다 — 종료 조건(`sawActiveJourney`)에
+         * 걸리지 않기 때문이다.
+         */
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
+        /*
+         * 시스템이 서비스를 끊는 경로(메모리 부족, 제조사 배터리 절약)에서는
+         * ACTION_STOP 이 오지 않는다. 여기서 컨트롤러를 세우지 않으면
+         * 싱글턴 스코프의 폴링 루프가 프로세스가 살아 있는 동안 계속 돌며
+         * 공공데이터 할당량과 배터리를 태운다. 알림도 없이 도는 안내는
+         * 어차피 어르신에게 닿지 않는다.
+         */
+        controller.stop()
         voice.stop()
         super.onDestroy()
     }

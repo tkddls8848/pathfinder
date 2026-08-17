@@ -40,10 +40,31 @@ class VoiceGuide @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
 
-    private var tts: TextToSpeech? = null
-    private var ready = false
-    private var lastSpoken: String? = null
-    private var lastSpokenAt: Long = 0L
+    /*
+     * 초기화는 메인 스레드에서 돌지만 speak() 는 안내 루프(Dispatchers.Default)
+     * 에서 불린다. 두 스레드가 같은 필드를 보므로 가시성을 명시한다.
+     * 없으면 준비가 끝났는데도 백그라운드 쪽이 한동안 옛 값을 봐서 안내가 샌다.
+     */
+    @Volatile private var tts: TextToSpeech? = null
+    @Volatile private var ready = false
+    @Volatile private var lastSpoken: String? = null
+    @Volatile private var lastSpokenAt: Long = 0L
+
+    /**
+     * 엔진이 준비되기 전에 들어온 발화 하나.
+     *
+     * 예전에는 그냥 버렸다. 출발 직후 첫 안내가 통째로 사라지는 경로였고,
+     * 특히 포그라운드 서비스가 새로 뜨며 엔진을 다시 여는 순간과 겹쳤다.
+     * 여러 개를 쌓아 두면 준비된 뒤 한꺼번에 쏟아지므로 마지막 하나만 남긴다 —
+     * 안내는 최신 상태만 의미가 있다.
+     */
+    @Volatile private var deferred: PendingUtterance? = null
+
+    private data class PendingUtterance(
+        val text: String,
+        val priority: Priority,
+        val allowRepeat: Boolean,
+    )
 
     private val audioManager = runCatching {
         context.getSystemService(AudioManager::class.java)
@@ -193,6 +214,13 @@ class VoiceGuide @Inject constructor(
         val callbacks = pendingReadyCallbacks.toList()
         pendingReadyCallbacks.clear()
         callbacks.forEach { it(success) }
+
+        // 기다리던 안내를 이제 내보낸다. 실패했으면 말할 방법이 없으니 버린다.
+        val waiting = deferred
+        deferred = null
+        if (success && waiting != null) {
+            speak(waiting.text, waiting.priority, allowRepeat = true)
+        }
     }
 
     /**
@@ -204,8 +232,13 @@ class VoiceGuide @Inject constructor(
         priority: Priority = Priority.NORMAL,
         allowRepeat: Boolean = false,
     ) {
-        val engine = tts ?: return
-        if (!ready || text.isBlank()) return
+        if (text.isBlank()) return
+        val engine = tts
+        if (engine == null || !ready) {
+            // 엔진이 아직 안 열렸다. 버리지 않고 들고 있다가 준비되면 말한다.
+            deferred = PendingUtterance(text, priority, allowRepeat)
+            return
+        }
 
         val now = System.currentTimeMillis()
         if (!allowRepeat && text == lastSpoken && now - lastSpokenAt < repeatSuppressionMs) return
@@ -244,6 +277,7 @@ class VoiceGuide @Inject constructor(
         tts = null
         ready = false
         initializing = false
+        deferred = null
         _activeVoice.value = null
         pendingReadyCallbacks.clear()
         clearPending()

@@ -2,6 +2,7 @@ package kr.eodiga.wayfinder.data.repository
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kr.eodiga.wayfinder.core.FailureReason
 import kr.eodiga.wayfinder.core.Outcome
 import kr.eodiga.wayfinder.core.outcomeOf
 import kr.eodiga.wayfinder.core.retrying
@@ -48,6 +49,9 @@ class PlaceRepository @Inject constructor(
 
     suspend fun saveGuardian(guardian: GuardianEntity) = guardianDao.upsert(guardian)
 
+    /** 저장된 값 기준으로 다음 우선순위를 매긴다. 화면 상태를 세지 않는다. */
+    suspend fun nextGuardianPriority(): Int = guardianDao.nextPriority()
+
     suspend fun deleteGuardian(id: String) = guardianDao.delete(id)
 
     suspend fun savePlace(place: Place, pinnedOrder: Int? = null) {
@@ -83,7 +87,9 @@ class PlaceRepository @Inject constructor(
                         val lat = dto.lat ?: return@mapNotNull null
                         val lng = dto.lng ?: return@mapNotNull null
                         Place(
-                            id = dto.id ?: "hpid:${dto.name}",
+                            // hpid 가 없을 때 이름만으로 키를 만들면 동명 병원이
+                            // 같은 id 를 갖는다. 목록의 key 가 겹쳐 화면이 죽는다.
+                            id = dto.id ?: "hpid:${dto.name}@${dto.address}",
                             name = dto.name.orEmpty(),
                             address = dto.address,
                             location = LatLng(lat, lng),
@@ -101,8 +107,14 @@ class PlaceRepository @Inject constructor(
      * 좌표변환 API 를 한 번 더 호출해야 하고, 그 좌표도 WGS84 가 아니라
      * GRS80 중부원점(EPSG:5179)이다. 변환은 [Epsg5179] 가 담당한다.
      */
-    suspend fun searchAddress(keyword: String): Outcome<List<Place>> = outcomeOf {
-        if (keys.jusoKey.isBlank()) return@outcomeOf emptyList()
+    suspend fun searchAddress(keyword: String): Outcome<List<Place>> {
+        // 승인키가 없으면 "결과 없음" 이 아니라 설정 문제다. 빈 목록으로 돌려주면
+        // 화면에 "그런 곳을 찾지 못했습니다" 가 떠서 원인을 영영 알 수 없다.
+        if (keys.jusoKey.isBlank()) return Outcome.Failure(FailureReason.NotConfigured)
+        return searchAddressOrThrow(keyword)
+    }
+
+    private suspend fun searchAddressOrThrow(keyword: String): Outcome<List<Place>> = outcomeOf {
 
         val found = jusoApi.searchAddress(
             url = "addrLinkApi.do",
@@ -131,11 +143,16 @@ class PlaceRepository @Inject constructor(
             val wgs = Epsg5179.toWgs84(x, y)
 
             Place(
+                // id 를 비워 두면 Place 의 기본값인 UUID 가 매번 새로 생긴다.
+                // 같은 주소를 두 번 저장하면 별개의 장소로 쌓이고, 자주 가는 곳이
+                // 위로 올라오지도 않는다. 주소 자체로 안정된 키를 만든다.
+                id = "juso:${juso.adminCode.orEmpty()}:${juso.roadCode.orEmpty()}:" +
+                    "${juso.buildingMainNo.orEmpty()}-${juso.buildingSubNo.orEmpty()}",
                 name = juso.buildingName?.takeIf { it.isNotBlank() } ?: juso.roadAddress.orEmpty(),
                 address = juso.roadAddress,
                 location = wgs,
                 kind = PlaceKind.OTHER,
             )
-        }.filter { it.location.isValid() }
+        }.distinctBy { it.id }.filter { it.location.isValid() }
     }
 }

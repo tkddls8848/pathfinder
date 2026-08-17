@@ -67,14 +67,17 @@ class SettingsViewModel @Inject constructor(
     val isConfigured: Boolean get() = keys.hasServiceKey
 
     fun addGuardian(name: String, phone: String) {
-        if (name.isBlank() || phone.isBlank()) return
+        // 숫자가 하나도 없으면 걸 수 없는 번호다. 저장해 두면 정작 급할 때
+        // "연락처가 없다" 가 아니라 "연결하지 못했다" 로 실패한다.
+        val digits = phone.filter { it.isDigit() || it == '+' }
+        if (name.isBlank() || digits.count { it.isDigit() } < MIN_PHONE_DIGITS) return
         viewModelScope.launch {
             places.saveGuardian(
                 GuardianEntity(
                     id = UUID.randomUUID().toString(),
                     name = name.trim(),
-                    phone = phone.filter { it.isDigit() || it == '+' },
-                    priority = guardians.value.size,
+                    phone = digits,
+                    priority = places.nextGuardianPriority(),
                 ),
             )
         }
@@ -86,6 +89,11 @@ class SettingsViewModel @Inject constructor(
 
     fun removePlace(id: String) {
         viewModelScope.launch { places.deletePlace(id) }
+    }
+
+    internal companion object {
+        /** 지역번호 없는 시내번호(예: 7712345)까지 받아주는 하한. */
+        const val MIN_PHONE_DIGITS = 7
     }
 }
 
@@ -208,7 +216,10 @@ fun SettingsScreen(
                         name = ""
                         phone = ""
                     },
-                    enabled = name.isNotBlank() && phone.isNotBlank(),
+                    // 버튼이 눌리는데 아무 일도 안 일어나면 고장으로 받아들인다.
+                    // 저장 조건과 같은 기준으로 막는다.
+                    enabled = name.isNotBlank() &&
+                        phone.count { it.isDigit() } >= SettingsViewModel.MIN_PHONE_DIGITS,
                 )
             }
         }

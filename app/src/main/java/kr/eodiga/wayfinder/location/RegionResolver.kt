@@ -4,6 +4,7 @@ import android.content.Context
 import android.location.Address
 import android.location.Geocoder
 import android.os.Build
+import androidx.annotation.RequiresApi
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -93,7 +94,14 @@ class RegionResolver @Inject constructor(
     }
 }
 
-/** Android 13+ Geocoder 는 성공과 실패를 별도 콜백으로 보낸다. 둘 중 하나만 완료한다. */
+/**
+ * Android 13+ Geocoder 는 성공과 실패를 별도 콜백으로 보낸다. 둘 중 하나만 완료한다.
+ *
+ * [Geocoder.GeocodeListener] 자체가 API 33 에 생긴 타입이라, minSdk 26 기기에서는
+ * 이 클래스가 아예 로드되지 않아야 한다. 호출부가 버전 분기 안에 있어 실제로
+ * 그렇지만, 의도를 코드로도 남겨 둔다.
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
 internal class FirstAddressListener(
     private val complete: (Address?) -> Unit,
 ) : Geocoder.GeocodeListener {

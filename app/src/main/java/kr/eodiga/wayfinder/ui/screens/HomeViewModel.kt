@@ -91,7 +91,9 @@ class RoutePlanViewModel @Inject constructor(
         viewModelScope.launch {
             val origin = location.currentLocation()
             if (origin == null) {
-                _state.value = RoutePlanUiState.Failed(FailureReason.NoResult)
+                // 출발지를 못 잡은 것이지 경로가 없는 것이 아니다.
+                // NoResult 로 말하면 보호자가 위치 설정을 볼 이유를 못 찾는다.
+                _state.value = RoutePlanUiState.Failed(FailureReason.NoLocation)
                 return@launch
             }
             when (val result = planner.plan(origin, place)) {

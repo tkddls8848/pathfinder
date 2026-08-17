@@ -7,6 +7,7 @@ import kr.eodiga.wayfinder.data.remote.api.WeatherApi
 import kr.eodiga.wayfinder.data.remote.dto.itemsOrThrow
 import kr.eodiga.wayfinder.domain.model.LatLng
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -102,11 +103,21 @@ class WeatherRepository @Inject constructor(
      *
      * 매시 정시 관측이 40분에 배포되므로, 40분 이전이면 한 시간 전 자료를 요청해야
      * NO_DATA 가 나지 않는다.
+     *
+     * 기상청 발표 시각은 KST 기준이다. 기기 시간대를 그대로 쓰면 해외 로밍이나
+     * 시간대가 잘못 잡힌 기기에서 엉뚱한 시각을 물어 NO_DATA 만 돌아온다.
      */
-    private fun latestNowcastBase(now: LocalDateTime = LocalDateTime.now()): Pair<String, String> {
+    internal fun latestNowcastBase(
+        now: LocalDateTime = LocalDateTime.now(KST),
+    ): Pair<String, String> {
         val base = if (now.minute < 40) now.minusHours(1) else now
         return base.format(DateTimeFormatter.ofPattern("yyyyMMdd")) to
             base.format(DateTimeFormatter.ofPattern("HH00"))
+    }
+
+    internal companion object {
+        /** 기상청 발표 시각 기준 시간대. */
+        val KST: ZoneId = ZoneId.of("Asia/Seoul")
     }
 }
 

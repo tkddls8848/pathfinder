@@ -29,6 +29,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -97,12 +98,19 @@ class SearchViewModel @Inject constructor(
      * 동시에 시도하고 결과를 합친다. 어르신에게 "병원을 찾을까요, 주소를 찾을까요"
      * 라고 되묻지 않는다.
      */
+    /** 앞선 검색. 새 검색이 들어오면 취소한다. */
+    private var searchJob: Job? = null
+
     fun search(query: String) {
         if (query.isBlank()) return
         _state.value = _state.value.copy(query = query, isSearching = true, failure = null)
 
-        viewModelScope.launch {
-            val region = location.currentLocation()?.let { regions.resolve(it) }
+        // 연달아 검색하면 늦게 시작한 것이 먼저 끝나 오래된 결과가 최신 결과를
+        // 덮어쓸 수 있다. 앞선 검색은 버린다.
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            val here = location.currentLocation()
+            val region = here?.let { regions.resolve(it) }
 
             val hospital = if (region != null) {
                 places.searchHospitals(region.sido, region.sigungu, query)
@@ -116,10 +124,19 @@ class SearchViewModel @Inject constructor(
                 addAll(address.getOrNull().orEmpty())
             }.distinctBy { it.name to it.address }
 
+            /*
+             * 결과가 없을 때 왜 없는지를 구분한다.
+             *
+             * 예전에는 전부 NoResult("지금은 알 수 있는 정보가 없습니다")로
+             * 수렴해, 위치 권한이 꺼진 것인지·주소검색 키가 없는 것인지·정말
+             * 그런 곳이 없는 것인지 보호자도 알 수 없었다. 앞의 둘은 설정으로
+             * 고칠 수 있는 문제이므로 그렇게 말해준다.
+             */
             val failure = when {
                 combined.isNotEmpty() -> null
                 hospital is Outcome.Failure -> hospital.reason
                 address is Outcome.Failure -> address.reason
+                here == null -> FailureReason.NoLocation
                 else -> FailureReason.NoResult
             }
 

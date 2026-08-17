@@ -134,7 +134,9 @@ class MusicPlayer @Inject constructor(
         val mp = runCatching { MediaPlayer() }.getOrNull() ?: return
         val started = runCatching {
             mp.setAudioAttributes(musicAttributes)
-            mp.setOnCompletionListener { next() }
+            // 완료 콜백 안에서 곧바로 next() 를 부르면 MediaPlayer 를 자기
+            // 콜백 안에서 reset/release 하게 된다. onError 와 같은 이유로 미룬다.
+            mp.setOnCompletionListener { mainHandler.post { next() } }
             mp.setOnErrorListener { _, _, _ ->
                 // 이 리스너 안에서 곧바로 다음 곡으로 넘어가면 MediaPlayer 를 자기
                 // 콜백 안에서 해제하게 된다. 메인 큐로 미뤄 한 박자 뒤에 처리한다.
@@ -155,7 +157,9 @@ class MusicPlayer @Inject constructor(
             player = mp
         } else {
             runCatching { mp.release() }
-            skipBroken()
+            // 곧바로 부르면 목록이 통째로 깨졌을 때 곡 수만큼 재귀가 쌓인다.
+            // 메인 큐로 넘겨 한 번에 한 곡씩 평평하게 처리한다.
+            mainHandler.post { skipBroken() }
         }
     }
 
@@ -176,6 +180,8 @@ class MusicPlayer @Inject constructor(
             return
         }
         _state.update { it.copy(index = nextIndex(it.index, size)) }
+        // startCurrent 가 다시 실패하면 mainHandler 로 되돌아온다. 재귀가 아니라
+        // 큐를 한 바퀴 도는 형태라 목록이 아무리 길어도 스택이 자라지 않는다.
         startCurrent()
     }
 

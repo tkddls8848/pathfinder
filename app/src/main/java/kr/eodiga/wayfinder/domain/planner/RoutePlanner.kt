@@ -63,6 +63,12 @@ class RoutePlanner @Inject constructor(
         const val MAX_ORIGIN_STOPS = 5
         const val MAX_DEST_STOPS = 5
         const val MAX_RESULTS = 3
+
+        /** 환승 탐색에서 정류소 하나당 살펴볼 노선 수. */
+        const val MAX_ROUTES_PER_STOP = 8
+
+        /** 환승 탐색 한쪽에서 정류소 목록을 조회할 노선 수 상한. */
+        const val MAX_TRANSFER_ROUTES = 20
     }
 
     /**
@@ -115,6 +121,15 @@ class RoutePlanner @Inject constructor(
 
     private fun List<BusStop>.withinRadius(center: LatLng) =
         filter { Geo.distanceMeters(center, it.location) <= SEARCH_RADIUS_M }
+
+    /**
+     * 환승 탐색에 쓸 (정류소, 노선) 쌍. 정류소당 노선 수를 잘라 호출량을 묶는다.
+     * 정류소는 이미 가까운 순으로 정렬되어 들어오므로 앞쪽이 걷기 쉬운 쪽이다.
+     */
+    private fun List<StopWithRoutes>.transferCandidates(): List<Pair<BusStop, BusRoute>> =
+        flatMap { s -> s.routes.take(MAX_ROUTES_PER_STOP).map { s.stop to it } }
+            .distinctBy { it.second.routeId to it.first.nodeId }
+            .take(MAX_TRANSFER_ROUTES)
 
     /** 정류소별 경유 노선을 한꺼번에 모은다. 정류소 수가 적어 병렬 호출해도 안전하다. */
     private suspend fun collectRoutes(stops: List<BusStop>): List<StopWithRoutes> = coroutineScope {
@@ -174,9 +189,20 @@ class RoutePlanner @Inject constructor(
         originSide: List<StopWithRoutes>,
         destSide: List<StopWithRoutes>,
     ): List<Journey> = coroutineScope {
-        // 양쪽 노선의 정류소 목록을 먼저 모두 가져온다(캐시가 대부분 흡수한다).
-        val firstLegRoutes = originSide.flatMap { s -> s.routes.map { s.stop to it } }.distinctBy { it.second.routeId to it.first.nodeId }
-        val secondLegRoutes = destSide.flatMap { s -> s.routes.map { s.stop to it } }.distinctBy { it.second.routeId to it.first.nodeId }
+        /*
+         * 양쪽 노선의 정류소 목록을 먼저 모두 가져온다.
+         *
+         * 여기서 후보를 자르지 않으면 정류소 5개 × 노선 20~40개로 노선이 200개
+         * 가까이 나온다. OkHttp 는 같은 호스트에 동시 5개까지만 보내므로
+         * 200개는 40묶음으로 직렬화되고, 재시도까지 겹치면 수십 초가 걸린다.
+         * 검색 한 번에 일일 할당량 10,000건 중 200건을 태우기도 한다.
+         *
+         * 정류소당 가까운 순으로 [MAX_ROUTES_PER_STOP] 개만 남긴다. 어차피
+         * 어르신에게 권할 환승은 한 번뿐이고, 후보를 넓혀 얻는 것보다
+         * 화면이 멎는 대가가 크다.
+         */
+        val firstLegRoutes = originSide.transferCandidates()
+        val secondLegRoutes = destSide.transferCandidates()
 
         val stopsByRoute = (firstLegRoutes + secondLegRoutes)
             .map { it.second }

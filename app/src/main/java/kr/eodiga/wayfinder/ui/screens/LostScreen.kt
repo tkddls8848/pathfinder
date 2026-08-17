@@ -166,6 +166,11 @@ internal fun presentLostResult(result: GuardianNotifier.Result): LostResultPrese
             "${name}님께 도움 요청 문자를 보내고 전화 화면을 열었습니다.\n현재 위치는 포함하지 못했습니다."
         result.smsSent ->
             "${name}님께 도움 요청 문자를 보냈습니다.\n현재 위치와 전화 연결은 확인하지 못했습니다."
+        // 보냈는지 아직 모르는 상태. 갔다고도, 못 갔다고도 하지 않는다.
+        result.smsStatus == GuardianNotifier.SmsStatus.REQUESTED && result.callStarted ->
+            "${name}님께 문자를 보내는 중입니다.\n전화 화면도 열었습니다."
+        result.smsStatus == GuardianNotifier.SmsStatus.REQUESTED ->
+            "${name}님께 문자를 보내는 중입니다.\n전화 화면은 열지 못했습니다."
         result.smsStatus == GuardianNotifier.SmsStatus.COMPOSER_OPENED && result.callStarted ->
             "문자와 전화 화면을 열었습니다.\n전송과 통화 버튼을 눌러 주세요."
         result.smsStatus == GuardianNotifier.SmsStatus.COMPOSER_OPENED ->

@@ -41,6 +41,12 @@ android {
         resourceConfigurations += listOf("ko")
     }
 
+    // Room 스키마를 파일로 남긴다. 이것이 있어야 다음 버전에서 마이그레이션을
+    // 검증할 수 있다. 저장된 장소와 보호자 연락처를 잃지 않기 위한 전제다.
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false

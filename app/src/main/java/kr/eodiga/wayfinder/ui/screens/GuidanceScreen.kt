@@ -1,5 +1,9 @@
 package kr.eodiga.wayfinder.ui.screens
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,9 +16,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import kr.eodiga.wayfinder.ui.components.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -50,6 +56,20 @@ fun GuidanceScreen(
     viewModel: GuidanceViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    /*
+     * 안내 중에는 화면을 켜 둔다. 걷다가 화면이 꺼지면 어르신은 당황한다.
+     *
+     * 예전에는 이 플래그를 MainActivity 에 걸어 두어 홈·설정·음악 화면에서도
+     * 화면이 꺼지지 않았다. 이 앱은 이동 내내 켜져 있어야 하고, 배터리가
+     * 떨어지면 하차 알림과 "길을 잃었어요" 가 함께 사라진다. 그래서
+     * 정말 필요한 화면에서만 켜고 벗어날 때 되돌린다.
+     */
+    val window = LocalContext.current.findActivity()?.window
+    DisposableEffect(window) {
+        window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
 
     // 상태에 따라 화면 배경색 자체가 바뀐다. 글씨를 못 읽어도 색으로 긴급도를 안다.
     val background = when (state.stage) {
@@ -403,3 +423,17 @@ private fun StageContent(
 }
 
 private fun Int.toSteps(): Int = (this / 0.65).toInt().coerceAtLeast(1)
+
+/**
+ * Compose 의 Context 는 Activity 가 ContextWrapper 로 감싸여 들어온다.
+ * activity-compose 1.10 의 LocalActivity 를 쓰려면 의존성을 올려야 해서
+ * 화면 켜둠 하나 때문에 그러기보다 직접 벗겨낸다.
+ */
+private fun Context.findActivity(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    return null
+}

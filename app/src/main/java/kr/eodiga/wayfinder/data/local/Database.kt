@@ -10,6 +10,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -102,6 +104,14 @@ interface GuardianDao {
     @Query("SELECT * FROM guardian ORDER BY priority ASC LIMIT 1")
     suspend fun primary(): GuardianEntity?
 
+    /**
+     * 다음 우선순위. 화면이 들고 있는 목록 크기로 매기면 저장이 반영되기 전에
+     * 연달아 추가할 때 같은 값이 붙고, 그러면 [primary] 가 누구를 고를지
+     * 알 수 없게 된다. 급할 때 전화가 갈 대상이라 흔들리면 안 된다.
+     */
+    @Query("SELECT COALESCE(MAX(priority), -1) + 1 FROM guardian")
+    suspend fun nextPriority(): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(guardian: GuardianEntity)
 
@@ -112,11 +122,56 @@ interface GuardianDao {
 @Database(
     entities = [SavedPlaceEntity::class, GuardianEntity::class],
     version = 2,
-    exportSchema = false,
+    // 스키마를 파일로 남겨야 다음 마이그레이션을 검증할 수 있다.
+    // app/schemas/ 에 쌓이며 커밋 대상이다.
+    exportSchema = true,
 )
 abstract class EodigaDatabase : RoomDatabase() {
     abstract fun savedPlaceDao(): SavedPlaceDao
     abstract fun guardianDao(): GuardianDao
+}
+
+/**
+ * 1 → 2: `saved_place` 에서 쓰지 않게 된 `phone` 컬럼을 걷어낸다.
+ *
+ * 예전에는 마이그레이션 없이 [androidx.room.RoomDatabase.Builder.fallbackToDestructiveMigration]
+ * 로 넘겼는데, 그러면 스키마가 바뀔 때마다 **보호자 연락처가 통째로 사라진다.**
+ * 어르신은 이것을 다시 등록할 수 없고(설정 화면의 대상은 보호자다),
+ * 연락처가 빈 채로 "길을 잃었어요" 만 동작하지 않는 상태가 된다.
+ * 앱이 조용히 무력해지는 가장 나쁜 경로라 마이그레이션을 직접 쓴다.
+ *
+ * SQLite 의 DROP COLUMN 은 3.35(안드로이드 14) 부터라 쓸 수 없다.
+ * 새 표를 만들어 옮기고 바꿔 끼우는, 어느 버전에서나 되는 방식을 쓴다.
+ */
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `saved_place_new` (
+                `id` TEXT NOT NULL,
+                `name` TEXT NOT NULL,
+                `address` TEXT,
+                `lat` REAL NOT NULL,
+                `lng` REAL NOT NULL,
+                `kind` TEXT NOT NULL,
+                `pinnedOrder` INTEGER,
+                `visitCount` INTEGER NOT NULL,
+                `lastVisitedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            INSERT INTO `saved_place_new`
+                (`id`, `name`, `address`, `lat`, `lng`, `kind`, `pinnedOrder`, `visitCount`, `lastVisitedAt`)
+            SELECT `id`, `name`, `address`, `lat`, `lng`, `kind`, `pinnedOrder`, `visitCount`, `lastVisitedAt`
+            FROM `saved_place`
+            """.trimIndent(),
+        )
+        db.execSQL("DROP TABLE `saved_place`")
+        db.execSQL("ALTER TABLE `saved_place_new` RENAME TO `saved_place`")
+    }
 }
 
 @Module
@@ -127,7 +182,9 @@ object DatabaseModule {
     @Singleton
     fun database(@ApplicationContext context: Context): EodigaDatabase =
         Room.databaseBuilder(context, EodigaDatabase::class.java, "eodiga.db")
-            .fallbackToDestructiveMigration()
+            .addMigrations(MIGRATION_1_2)
+            // 다운그레이드(옛 APK 재설치)는 되돌릴 경로 자체가 없다. 이때만 새로 만든다.
+            .fallbackToDestructiveMigrationOnDowngrade()
             .build()
 
     @Provides fun savedPlaceDao(db: EodigaDatabase): SavedPlaceDao = db.savedPlaceDao()
