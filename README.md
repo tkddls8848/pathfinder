@@ -111,6 +111,17 @@ JUSO_CONFIRM_KEY=주소검색_승인키   # 선택
 > GitHub 이 대신 빌드해 APK 를 Artifacts 로 올려줍니다. 폰에서 받아 설치할 수 있습니다.
 > 인증키 등록부터 설치·권한 설정까지 [`docs/install.md`](docs/install.md) 에 정리해 두었습니다.
 
+> **폰이 없다면** — PC 의 안드로이드 에뮬레이터에서 앱을 그대로 돌릴 수 있습니다.
+> 이 앱은 위치가 움직여야 화면이 진행되므로 가짜 이동을 넣어 주어야 합니다.
+> 에뮬레이터 준비부터 경로 재생까지 [`docs/desktop-testing.md`](docs/desktop-testing.md) 에 있습니다.
+>
+> 윈도우·맥·리눅스 모두 됩니다. 도구는 파이썬이라 셸 종류를 가리지 않습니다.
+>
+> ```bash
+> python3 tools/desktop_run.py              # 설치 → 실행 → 스크린샷 → 생사 확인
+> python3 tools/desktop_run.py --simulate   # 가짜로 걷게 만들어 화면을 진행시킨다
+> ```
+
 ### 4. 첫 실행
 
 1. 위치·알림 권한 허용
