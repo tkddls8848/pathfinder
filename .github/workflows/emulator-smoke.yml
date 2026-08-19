@@ -1,0 +1,68 @@
+name: 에뮬레이터 구동 시험
+
+# 데스크톱(리눅스 러너) 안에서 안드로이드 에뮬레이터를 띄우고, 그 위에 앱을
+# 설치해 실제로 실행해 본다. 폰이 없어도 앱이 뜨는지 확인할 수 있고,
+# 결과 스크린샷은 실행 요약 화면 하단 Artifacts 에 붙는다.
+#
+# 내 PC 에서 같은 것을 하려면: docs/desktop-testing.md
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17 준비
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle 준비
+        uses: gradle/actions/setup-gradle@v4
+
+      # 하드웨어 가속이 없으면 에뮬레이터는 부팅조차 못 끝낸다.
+      # 러너에는 /dev/kvm 이 있지만 기본 권한으로는 열리지 않는다.
+      - name: KVM 사용 허가
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: 디버그 APK 빌드
+        env:
+          PUBLIC_DATA_SERVICE_KEY: ${{ secrets.PUBLIC_DATA_SERVICE_KEY }}
+          JUSO_CONFIRM_KEY: ${{ secrets.JUSO_CONFIRM_KEY }}
+          SEOUL_OPEN_API_KEY: ${{ secrets.SEOUL_OPEN_API_KEY }}
+        run: ./gradlew --console=plain assembleDebug
+
+      - name: 에뮬레이터에서 앱 실행
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          # 이 앱은 Google Play services 의 위치 제공자를 쓴다.
+          # AOSP(default) 이미지로 하면 앱은 뜨지만 위치가 영영 잡히지 않는다.
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash tools/emulator_smoke.sh --no-build --out build/desktop-smoke
+
+      - name: 결과 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-smoke
+          path: build/desktop-smoke/
+          if-no-files-found: warn
+          retention-days: 14
