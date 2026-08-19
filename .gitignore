@@ -19,3 +19,7 @@ local.properties
 # 프로토타입 음성 샘플 (edge-tts 생성). 약관상 배포 대상이 아니므로 커밋하지 않는다.
 # tools/make_voice_samples.py 로 언제든 다시 만들 수 있다.
 docs/voice-samples/
+
+# 파이썬 도구 실행 부산물 (tools/desktop_run.py 가 make_demo_gpx 를 가져다 쓴다)
+__pycache__/
+*.pyc

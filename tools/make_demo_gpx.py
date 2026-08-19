@@ -13,7 +13,8 @@
 
   gpx  : 에뮬레이터 Extended controls > Location > Import GPX 로 불러와 재생
   kml  : 같은 화면에서 KML 로 불러올 때
-  sh   : 창 없는(headless) 데스크톱용. `adb emu geo fix` 를 sleep 과 함께 뿌린다
+  sh   : 창 없는(headless) 맥·리눅스용. `adb emu geo fix` 를 sleep 과 함께 뿌린다.
+         윈도우에서는 셸이 필요 없는 `tools/desktop_run.py --simulate` 를 쓴다.
 
 사용 예:
 

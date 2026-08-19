@@ -18,6 +18,30 @@ PC 안에 통째로 띄우는 것이라, 이 앱이 쓰는 GPS·음성 안내·�
 
 ---
 
+## 어느 OS 에서 되나 — 리눅스만이 아닙니다
+
+에뮬레이터는 구글이 세 OS 모두를 위해 내놓은 도구입니다. 여기 있는 도구도
+파이썬으로 써서 셸 종류를 가리지 않습니다.
+
+| | 윈도우 | 맥 | 리눅스 |
+|---|---|---|---|
+| 에뮬레이터 | ○ | ○ (Apple Silicon 포함) | ○ |
+| `tools/desktop_run.py` | ○ 명령 프롬프트·PowerShell 그대로 | ○ | ○ |
+| `tools/make_demo_gpx.py` | ○ | ○ | ○ |
+| 별도로 필요한 것 | 하이퍼바이저 플랫폼 켜기 | 없음(arm64 이미지 선택) | KVM 권한 |
+
+필요한 것은 **파이썬 3** 하나뿐입니다(표준 라이브러리만 씁니다). Git Bash·WSL 은
+필요하지 않고, 윈도우에서는 보통 `py tools\desktop_run.py` 로 부릅니다.
+
+> **검증 범위를 밝혀 둡니다.** 이 문서의 절차 중 실제로 끝까지 돌려 확인한 것은
+> **리눅스(GitHub Actions 러너, Android 14 / x86_64 에뮬레이터)** 입니다 —
+> `.github/workflows/emulator-smoke.yml` 의 실행 기록이 그 증거입니다.
+> 맥·윈도우는 OS 별 분기(`gradlew.bat`, `adb.exe`, SDK 기본 경로, 콘솔 인코딩)를
+> 코드로 갈라 두고 그 분기를 시험했지만, 해당 OS 에서 전체를 돌려 본 것은
+> 아닙니다. 막히는 데가 있으면 그건 문서의 빈틈이니 알려 주세요.
+
+---
+
 ## 어떤 방법이 있나
 
 | | A. 에뮬레이터 | B. 기기 없이 JVM | C. GitHub Actions |
@@ -80,12 +104,15 @@ emulator -avd eodiga
 에뮬레이터가 떠 있는 상태에서 저장소 최상위에서:
 
 ```bash
-bash tools/emulator_smoke.sh
+python3 tools/desktop_run.py
 ```
 
-이 스크립트가 하는 일:
+윈도우 명령 프롬프트·PowerShell 에서도 같습니다(`py tools\desktop_run.py`).
+Git Bash 나 WSL 이 필요하지 않습니다.
 
-1. 디버그 APK 를 찾고, 없으면 `./gradlew assembleDebug` 로 빌드
+이 도구가 하는 일:
+
+1. 디버그 APK 를 찾고, 없으면 빌드 (`gradlew assembleDebug`, 윈도우는 `gradlew.bat`)
 2. 화면 잠금 해제 후 설치
 3. 앱이 시작할 때 묻는 권한(위치·알림)만 미리 허용 — 대화상자를 건너뜁니다
 4. 앱 실행 + 시작 좌표 주입 + 스크린샷 저장
@@ -97,7 +124,7 @@ bash tools/emulator_smoke.sh
 APK 를 이미 받아 두었다면(예: Actions 에서 내려받은 것):
 
 ```bash
-bash tools/emulator_smoke.sh --no-build --apk ~/Downloads/app-debug.apk
+python3 tools/desktop_run.py --no-build --apk ~/Downloads/app-debug.apk
 ```
 
 수동으로 하고 싶다면 이게 전부입니다:
@@ -127,19 +154,21 @@ python3 tools/make_demo_gpx.py --out demo.gpx
 에뮬레이터 오른쪽 `⋯`(Extended controls) → **Location** → **Routes/Import GPX** →
 `demo.gpx` 열기 → **Play**. 재생 속도도 그 화면에서 바꿉니다.
 
-**② 창 없이 명령줄로**
+**② 창 없이 명령줄로** (`sh` 는 맥·리눅스용입니다. 윈도우는 아래 ③ 을 쓰세요)
 
 ```bash
 python3 tools/make_demo_gpx.py --format sh --speed 10 --out demo.sh
 bash demo.sh          # adb emu geo fix 를 시간표대로 뿌립니다
 ```
 
-**③ 스모크 스크립트에 붙여서 한 번에**
+**③ 실행과 재생을 한 번에 (파일이 필요 없음)**
 
 ```bash
-python3 tools/make_demo_gpx.py --format sh --speed 10 --out demo.sh
-bash tools/emulator_smoke.sh --route demo.sh
+python3 tools/desktop_run.py --simulate --speed 10
 ```
+
+설치·실행·좌표 재생까지 한 명령으로 합니다. 창이 없는 환경에서도 되고,
+에뮬레이터 창을 열어 두면 화면이 스스로 넘어가는 것이 보입니다.
 
 좌표 한 점만 던질 수도 있습니다. `geo fix` 는 **경도가 먼저**입니다:
 
@@ -278,4 +307,4 @@ Android Studio 에서 화면 파일을 열면 **미리보기(Preview)** 가 PC �
 | `Failure [INSTALL_FAILED_...]` | 기존 설치본과 서명 충돌 | `adb uninstall kr.eodiga.wayfinder.debug` 후 재설치 |
 | `package not found` | `.debug` 접미사 누락 | 패키지는 `kr.eodiga.wayfinder.debug` |
 | 화면마다 "인증키 없음" | 키 미설정 | A-8 |
-| `adb: command not found` | platform-tools 가 PATH 에 없음 | 윈도우 `%LOCALAPPDATA%\Android\Sdk\platform-tools`,<br>맥·리눅스 `~/Android/Sdk/platform-tools` |
+| `adb: command not found` | platform-tools 가 PATH 에 없음 | `desktop_run.py` 는 SDK 기본 위치를 알아서 뒤집니다.<br>그래도 못 찾으면 `ANDROID_HOME` 을 SDK 경로로 지정하세요.<br>(윈도우 `%LOCALAPPDATA%\Android\Sdk`, 맥 `~/Library/Android/sdk`, 리눅스 `~/Android/Sdk`) |

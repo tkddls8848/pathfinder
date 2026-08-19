@@ -115,9 +115,11 @@ JUSO_CONFIRM_KEY=주소검색_승인키   # 선택
 > 이 앱은 위치가 움직여야 화면이 진행되므로 가짜 이동을 넣어 주어야 합니다.
 > 에뮬레이터 준비부터 경로 재생까지 [`docs/desktop-testing.md`](docs/desktop-testing.md) 에 있습니다.
 >
+> 윈도우·맥·리눅스 모두 됩니다. 도구는 파이썬이라 셸 종류를 가리지 않습니다.
+>
 > ```bash
-> bash tools/emulator_smoke.sh                       # 설치 → 실행 → 스크린샷
-> python3 tools/make_demo_gpx.py --out demo.gpx      # 가짜 이동 경로
+> python3 tools/desktop_run.py              # 설치 → 실행 → 스크린샷 → 생사 확인
+> python3 tools/desktop_run.py --simulate   # 가짜로 걷게 만들어 화면을 진행시킨다
 > ```
 
 ### 4. 첫 실행
