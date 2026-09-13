@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -31,6 +32,17 @@ import androidx.compose.ui.unit.dp
 import kr.eodiga.wayfinder.service.VoiceGuide
 import kr.eodiga.wayfinder.ui.theme.EodigaColors
 import kr.eodiga.wayfinder.ui.theme.EodigaDimens
+
+/**
+ * 상태바·내비게이션바에 가리지 않도록 화면 내용을 안쪽으로 들인다.
+ *
+ * targetSdk 35 부터 안드로이드는 앱을 화면 끝까지 그리게 강제한다. 글씨가 큰
+ * 앱이라 제목 한 줄이 통째로 시계에 가려지므로 반드시 물려야 한다.
+ *
+ * 배경보다 뒤에 붙인다. 그래야 배경색은 화면 끝까지 차고 내용만 안으로 들어온다.
+ * 안내 화면은 배경색 자체가 긴급도 신호라서 이 순서가 중요하다.
+ */
+fun Modifier.screenInsets(): Modifier = safeDrawingPadding()
 
 /**
  * 주 동작 버튼.

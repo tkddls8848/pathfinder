@@ -21,6 +21,7 @@ import kr.eodiga.wayfinder.ui.components.DestinationButton
 import kr.eodiga.wayfinder.ui.components.InfoCard
 import kr.eodiga.wayfinder.ui.components.ScreenTitle
 import kr.eodiga.wayfinder.ui.components.SecondaryActionButton
+import kr.eodiga.wayfinder.ui.components.screenInsets
 import kr.eodiga.wayfinder.ui.theme.EodigaColors
 import kr.eodiga.wayfinder.ui.theme.EodigaDimens
 
@@ -43,7 +44,7 @@ fun HomeScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().screenInsets(),
         contentPadding = PaddingValues(EodigaDimens.ScreenPadding),
         verticalArrangement = Arrangement.spacedBy(EodigaDimens.ElementGap),
     ) {

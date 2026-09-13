@@ -49,6 +49,7 @@ import kr.eodiga.wayfinder.ui.components.LoadingState
 import kr.eodiga.wayfinder.ui.components.PrimaryActionButton
 import kr.eodiga.wayfinder.ui.components.ScreenTitle
 import kr.eodiga.wayfinder.ui.components.SecondaryActionButton
+import kr.eodiga.wayfinder.ui.components.screenInsets
 import kr.eodiga.wayfinder.ui.theme.EodigaColors
 import kr.eodiga.wayfinder.ui.theme.EodigaDimens
 import javax.inject.Inject
@@ -171,7 +172,7 @@ fun SearchScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().screenInsets(),
         contentPadding = PaddingValues(EodigaDimens.ScreenPadding),
         verticalArrangement = Arrangement.spacedBy(EodigaDimens.ElementGap),
     ) {

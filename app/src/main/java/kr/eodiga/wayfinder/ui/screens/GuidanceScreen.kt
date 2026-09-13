@@ -36,6 +36,7 @@ import kr.eodiga.wayfinder.ui.components.InfoCard
 import kr.eodiga.wayfinder.ui.components.LostHelpBar
 import kr.eodiga.wayfinder.ui.components.PrimaryActionButton
 import kr.eodiga.wayfinder.ui.components.SecondaryActionButton
+import kr.eodiga.wayfinder.ui.components.screenInsets
 import kr.eodiga.wayfinder.ui.theme.EodigaColors
 import kr.eodiga.wayfinder.ui.theme.EodigaDimens
 
@@ -82,7 +83,8 @@ fun GuidanceScreen(
         else -> MaterialTheme.colorScheme.onBackground
     }
 
-    Column(modifier = modifier.fillMaxSize().background(background)) {
+    // 배경색 뒤에 물린다 — 색은 화면 끝까지 차고, 글자만 시계·제스처 막대를 피한다.
+    Column(modifier = modifier.fillMaxSize().background(background).screenInsets()) {
         Column(
             modifier = Modifier
                 .weight(1f)

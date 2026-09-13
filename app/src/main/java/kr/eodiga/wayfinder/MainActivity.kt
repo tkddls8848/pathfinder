@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.speech.RecognizerIntent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
@@ -55,6 +56,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // API 35 부터는 어차피 강제된다. 여기서 켜 두어야 그 아래 버전에서도
+        // 같은 화면이 나온다 — 화면마다 붙인 screenInsets() 가 두 버전 모두에서
+        // 같은 여백을 만든다.
+        enableEdgeToEdge()
 
         voiceGuide.initialize()
 

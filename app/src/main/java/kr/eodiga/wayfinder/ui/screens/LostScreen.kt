@@ -20,6 +20,7 @@ import kr.eodiga.wayfinder.ui.components.InfoCard
 import kr.eodiga.wayfinder.ui.components.PrimaryActionButton
 import kr.eodiga.wayfinder.ui.components.ScreenTitle
 import kr.eodiga.wayfinder.ui.components.SecondaryActionButton
+import kr.eodiga.wayfinder.ui.components.screenInsets
 import kr.eodiga.wayfinder.ui.theme.EodigaColors
 import kr.eodiga.wayfinder.ui.theme.EodigaDimens
 
@@ -52,6 +53,7 @@ fun LostScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .screenInsets()
             .verticalScroll(rememberScrollState())
             .padding(EodigaDimens.ScreenPadding),
         verticalArrangement = Arrangement.spacedBy(EodigaDimens.ElementGap),

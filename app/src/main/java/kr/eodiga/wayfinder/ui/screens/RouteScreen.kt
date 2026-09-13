@@ -39,6 +39,7 @@ import kr.eodiga.wayfinder.ui.components.LoadingState
 import kr.eodiga.wayfinder.ui.components.PrimaryActionButton
 import kr.eodiga.wayfinder.ui.components.ScreenTitle
 import kr.eodiga.wayfinder.ui.components.SecondaryActionButton
+import kr.eodiga.wayfinder.ui.components.screenInsets
 import kr.eodiga.wayfinder.ui.theme.EodigaColors
 import kr.eodiga.wayfinder.ui.theme.EodigaDimens
 
@@ -66,13 +67,13 @@ fun RouteScreen(
         RoutePlanUiState.Loading,
         -> LoadingState(
             message = "${destination.name} 가는 길을\n찾고 있습니다",
-            modifier = modifier.fillMaxSize().padding(top = 120.dp),
+            modifier = modifier.fillMaxSize().screenInsets().padding(top = 120.dp),
         )
 
         is RoutePlanUiState.Failed -> ErrorState(
             message = s.reason.spokenMessage,
             onRetry = { viewModel.retry() },
-            modifier = modifier.fillMaxSize().padding(top = 120.dp),
+            modifier = modifier.fillMaxSize().screenInsets().padding(top = 120.dp),
         )
 
         is RoutePlanUiState.Ready -> RouteReadyContent(
@@ -101,7 +102,7 @@ private fun RouteReadyContent(
     val journey = state.selected
 
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().screenInsets(),
         contentPadding = PaddingValues(EodigaDimens.ScreenPadding),
         verticalArrangement = Arrangement.spacedBy(EodigaDimens.ElementGap),
     ) {

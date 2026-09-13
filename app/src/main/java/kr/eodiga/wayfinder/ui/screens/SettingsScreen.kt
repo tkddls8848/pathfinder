@@ -38,6 +38,7 @@ import kr.eodiga.wayfinder.ui.components.InfoCard
 import kr.eodiga.wayfinder.ui.components.PrimaryActionButton
 import kr.eodiga.wayfinder.ui.components.ScreenTitle
 import kr.eodiga.wayfinder.ui.components.SecondaryActionButton
+import kr.eodiga.wayfinder.ui.components.screenInsets
 import kr.eodiga.wayfinder.ui.theme.EodigaColors
 import kr.eodiga.wayfinder.ui.theme.EodigaDimens
 import java.util.UUID
@@ -120,7 +121,7 @@ fun SettingsScreen(
     var confirmingDeleteId by remember { mutableStateOf<String?>(null) }
 
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().screenInsets(),
         contentPadding = PaddingValues(EodigaDimens.ScreenPadding),
         verticalArrangement = Arrangement.spacedBy(EodigaDimens.ElementGap),
     ) {
