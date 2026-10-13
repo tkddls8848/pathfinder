@@ -51,6 +51,13 @@ class RoutePlanner @Inject constructor(
         /** 이 거리 안이면 버스를 타지 않고 걸어가는 편이 낫다. */
         const val WALK_ONLY_THRESHOLD_M = 700.0
 
+        /**
+         * 버스 경로를 못 찾았을 때 도보로 대신 안내해도 되는 직선거리 상한.
+         * 넘으면 도보 안내 대신 빈 결과를 돌려준다. 서울처럼 정류소가 0건인
+         * 곳에서 "걸어서 3336분" 을 안내한 일이 있다. 그건 빈 화면보다 나쁘다.
+         */
+        const val MAX_WALK_FALLBACK_M = 2_000.0
+
         /** 도심 시내버스 정류장 간 평균 소요(분). 정차·신호 대기 포함. */
         const val MINUTES_PER_STOP = 2.0
 
@@ -97,8 +104,7 @@ class RoutePlanner @Inject constructor(
         }
 
         if (originStops.isEmpty() || destStops.isEmpty()) {
-            // 정류소가 없으면 걸어가는 안내라도 준다. 빈 화면보다 낫다.
-            return Outcome.Success(listOf(walkOnlyJourney(origin, destination, straightLine)))
+            return Outcome.Success(walkFallback(origin, destination, straightLine))
         }
 
         val originRoutes = collectRoutes(originStops)
@@ -114,10 +120,12 @@ class RoutePlanner @Inject constructor(
             .distinctBy { j -> j.busLegs.map { it.route.routeId to it.boardStop.nodeId } }
             .take(MAX_RESULTS)
 
-        return Outcome.Success(
-            ranked.ifEmpty { listOf(walkOnlyJourney(origin, destination, straightLine)) },
-        )
+        return Outcome.Success(ranked.ifEmpty { walkFallback(origin, destination, straightLine) })
     }
+
+    /** 버스 경로가 없을 때의 도보 안내. 걸어갈 만한 거리가 아니면 비워 둔다. */
+    private fun walkFallback(origin: LatLng, destination: Place, meters: Double): List<Journey> =
+        if (meters <= MAX_WALK_FALLBACK_M) listOf(walkOnlyJourney(origin, destination, meters)) else emptyList()
 
     private fun List<BusStop>.withinRadius(center: LatLng) =
         filter { Geo.distanceMeters(center, it.location) <= SEARCH_RADIUS_M }

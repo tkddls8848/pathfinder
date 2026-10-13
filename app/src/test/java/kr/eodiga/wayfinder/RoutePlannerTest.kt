@@ -71,11 +71,35 @@ class RoutePlannerTest {
 
         val journeys = (planner.plan(origin, destination) as Outcome.Success).value
 
-        // 유효한 버스 경로가 없으므로 도보 안내로 대체된다.
+        // 유효한 버스 경로가 없고 걸어가기에도 멀어 빈 결과가 된다.
         assertTrue(
             "반대 방향 노선이 제안되었다",
             journeys.all { j -> j.legs.none { it is JourneyLeg.Bus } },
         )
+    }
+
+    /**
+     * 서울은 TAGO 에 버스 데이터가 없어 정류소가 항상 0건이다. 예전에는 거리와
+     * 무관하게 도보로 대체해 "걸어서 3336분" 을 안내했다.
+     */
+    @Test
+    fun `정류소가 없고 목적지가 멀면 도보로 대신 안내하지 않는다`() = runTest {
+        coEvery { transit.nearbyStops(any(), any()) } returns Outcome.Success(emptyList())
+
+        val journeys = (planner.plan(origin, destination) as Outcome.Success).value
+
+        assertTrue(journeys.isEmpty())
+    }
+
+    @Test
+    fun `정류소가 없어도 걸어갈 만한 거리면 도보로 안내한다`() = runTest {
+        val walkable = destination.copy(location = LatLng(37.5135, 127.0000)) // 약 1.5km
+        coEvery { transit.nearbyStops(any(), any()) } returns Outcome.Success(emptyList())
+
+        val journeys = (planner.plan(origin, walkable) as Outcome.Success).value
+
+        assertEquals(1, journeys.size)
+        assertTrue(journeys[0].legs.all { it is JourneyLeg.Walk })
     }
 
     @Test

@@ -100,7 +100,7 @@ class RoutePlanViewModel @Inject constructor(
                 is Outcome.Failure -> _state.value = RoutePlanUiState.Failed(result.reason)
                 is Outcome.Success -> {
                     _state.value = if (result.value.isEmpty()) {
-                        RoutePlanUiState.Failed(FailureReason.NoResult)
+                        RoutePlanUiState.Failed(FailureReason.NoRoute)
                     } else {
                         RoutePlanUiState.Ready(result.value)
                     }
