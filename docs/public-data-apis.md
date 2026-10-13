@@ -165,6 +165,15 @@ Q0=서울특별시    →      0건   Q1=중구 → 0건   QN=<정확한 기관�
 따라서 이 API 로는 **이름·지역 검색을 할 수 없습니다.** 목적지 검색은
 7번(도로명주소)에 의존해야 하고, 그 승인키가 없으면 검색 기능 전체가 비어 있습니다.
 
+> **보탬 (2026-10-13).** 다른 프로젝트가 같은 연산에서 `Q0=강원특별자치도`·`Q1=인제군` 으로
+> 29건을 받았다는 실측이 있습니다(2026-09, 2차 근거). 그래서 앱의 이중 인코딩을 먼저 의심했지만,
+> 코드로는 아닙니다. `HospitalApi` 는 Retrofit `@Query`(인코딩 1회)로 보내고,
+> `PublicDataInterceptor` 는 `serviceKey`·`_type` 만 덧붙입니다. 그쪽도 `URLSearchParams`
+> (인코딩 1회)와 `_type=json` 을 씁니다. 보내는 방식은 같습니다.
+> 남은 가설은 값(서울·중구 vs 강원·인제)이나 시점(2026-08 vs 2026-09)에 따라 서버 동작이 다르다는
+> 것입니다. `tools/probe_metro_apis.py --only nmc-encoding` 이 네 경우를 한 번에 비교합니다.
+> 심평원 병원정보(§9-3)가 동작하면 이 API 는 빠지므로 원인은 그 뒤에 따지지 않아도 됩니다.
+
 ---
 
 ## 2-8. 서울에는 TAGO 버스 데이터가 없다
@@ -197,9 +206,13 @@ Q0=서울특별시    →      0건   Q1=중구 → 0건   QN=<정확한 기관�
 
 ## 3. 경로 탐색을 직접 구현한 이유
 
-**공공데이터포털에는 "출발지 → 목적지 환승 경로"를 주는 오픈API 가 없습니다.**
-제공되는 것은 정류소·노선·도착·위치 네 가지 원본 데이터뿐입니다.
-(대중교통 길찾기는 ODsay, 카카오 등 상용 API 영역입니다.)
+TAGO 는 정류소·노선·도착·위치 네 가지 원본 데이터만 줍니다. "출발지 → 목적지 환승 경로"를
+주는 연산이 없습니다.
+
+> **정정 (2026-10-13).** 처음에는 "공공데이터포털 전체에 환승 경로 API 가 없다"고 적었는데
+> 틀렸습니다. 서울시 대중교통환승경로 조회(15000414)가 버스·지하철 환승 경로를 줍니다.
+> 다만 서울시 API 이고 아직 실호출하지 않았습니다. 명세는 [§9-2](#9-2-서울-대중교통환승경로-15000414)에
+> 있습니다. 쓰더라도 아래 4번 단계(진행 방향 검증)는 그대로 거칩니다.
 
 그래서 `RoutePlanner` 가 원본 데이터를 조합해 경로를 만듭니다.
 
@@ -329,11 +342,17 @@ Q0=서울특별시    →      0건   Q1=중구 → 0건   QN=<정확한 기관�
 
 기능은 전부 있습니다. 문제는 다섯 가지 차이입니다.
 
-### 8-1. XML 전용입니다
+### 8-1. 기본은 XML, `resultType=json` 이면 JSON (공식, 실호출 전)
 
-모든 오퍼레이션의 Output 이 `XML` 하나뿐입니다. TAGO 의 `_type=json`([§2-4](#2-4-_typejson-을-빼먹으면-xml-이-온다))
-같은 스위치가 **없습니다.** 지금 `NetworkModule` 은 Moshi 컨버터만 물려 있으므로
-XML 컨버터를 따로 붙이거나 파서를 직접 써야 합니다. 다섯 중 가장 큰 차이입니다.
+> **정정 (2026-10-13).** 처음에는 "XML 전용"이라고 적었습니다. api.bus.go.kr 레퍼런스에는
+> 지금도 `Data format : XML` 만 있습니다. 그런데 data.go.kr 에 올라온 네 데이터셋의 활용가이드
+> (2023-03 ~ 2025-09 개정판)는 모두 교환 데이터 표준을 `XML, JSON` 으로 표시하고
+> 요청 변수 `resultType`(`xml`·`json`)을 적어 둡니다. 정리는 [§9-1](#9-1-서울-버스-4종) 에 있습니다.
+
+TAGO 의 `_type=json`([§2-4](#2-4-_typejson-을-빼먹으면-xml-이-온다))과 **이름이 다릅니다.**
+`PublicDataInterceptor` 가 붙이는 `_type` 은 서울 API 에서 의미가 없습니다.
+실호출로 JSON 이 확인되면 XML 컨버터는 필요 없습니다. 확인되지 않으면 원래 계획대로
+XML 컨버터를 붙이거나 파서를 직접 씁니다.
 
 ### 8-2. 정류소 식별자가 두 개고, 오퍼레이션마다 요구하는 것이 다릅니다
 
@@ -399,3 +418,95 @@ data.go.kr 에서 **네 건을 각각** 신청합니다. 공공데이터포털 �
 | [서울특별시_노선정보조회](https://www.data.go.kr/data/15000193/openapi.do) | `busRouteInfo` |
 | [서울특별시_버스도착정보조회](https://www.data.go.kr/data/15000314/openapi.do) | `arrive` |
 | [서울특별시_버스위치정보조회](https://www.data.go.kr/data/15000332/openapi.do) | `buspos` |
+
+---
+
+## 9. 수도권 연동 0단계 — 키 없이 확인한 것 (2026-10-13)
+
+[`metro-api-plan.md`](metro-api-plan.md) §3 0단계의 결과입니다. 인증키가 없는 환경에서
+돌렸으므로 **응답 내용은 아직 아무것도 보지 않았습니다.** 확인한 것은 세 종류입니다.
+
+- **경로 실측.** 게이트웨이(`apis.data.go.kr`)는 인증키보다 경로를 먼저 봅니다. 아무 키나 넣어
+  `SERVICE_KEY_IS_NOT_REGISTERED_ERROR` 가 오면 경로가 있다는 뜻이고, `NO_OPENAPI_SERVICE_ERROR`
+  가 오면 없다는 뜻입니다([§1 두 오류를 구분하세요](#두-오류를-구분하세요)). 오퍼레이션 이름 한 글자만 바꿔도
+  `NO_OPENAPI_SERVICE_ERROR` 로 바뀌는 것까지 확인했으므로 이 방법은 믿을 만합니다.
+  `ws.bus.go.kr` 은 키를 먼저 보므로 이 방법이 통하지 않습니다(없는 경로도 401).
+- **공식 명세 직접 열람.** data.go.kr 데이터셋 페이지, 그 페이지가 품은 Swagger, 첨부 활용가이드(docx),
+  api.bus.go.kr 안내 페이지를 내려받아 읽었습니다.
+- **코드 확인.** 앱 쪽 원인을 의심한 항목은 소스로 확인했습니다.
+
+남은 확인은 `tools/probe_metro_apis.py` 가 키를 넣으면 한 번에 돌립니다.
+
+```
+python3 tools/probe_metro_apis.py --list     # 확인 목록
+python3 tools/probe_metro_apis.py            # 전부. 원본 응답은 build/metro-probe/
+```
+
+### 9-1. 서울 버스 4종
+
+| 확인 | 결과 | 근거 |
+|---|---|---|
+| https | **안 됩니다.** `ws.bus.go.kr:443` 에 TCP 연결이 안 됩니다(15초 타임아웃). 활용가이드 다섯 개 모두 전송 레벨 암호화 "없음" | 실측 · 공식 |
+| JSON | 활용가이드 네 개 모두 `resultType=json` 을 적어 둡니다. data.go.kr 페이지의 데이터 포맷은 15000303·15000193·15000332 가 `JSON+XML`, 15000314(도착)만 `XML` 로 엇갈립니다 | 공식. 실호출 전 |
+| 키 오류 모양 | 등록되지 않은 키는 `headerCd` 가 아니라 **HTTP 401** 과 봉투 없는 JSON 으로 옵니다. `resultType` 과 무관합니다 | 실측 |
+| 상업 이용 | api.bus.go.kr 소개 페이지 원문: "당해 오픈 API 서비스는 상업적으로 이용 불가합니다." data.go.kr 은 공공누리 1유형(출처표시, 상업 이용 가능)이라 그대로 엇갈립니다 | 공식 |
+| 요청 주소 | data.go.kr 에 적힌 주소가 §8 표와 같습니다(`getStaionByRoute` 오타 포함) | 공식 |
+
+키 오류 응답은 이렇게 옵니다. §8 의 `headerCd` 분류만으로는 잡히지 않으므로 서울 응답 봉투는
+HTTP 상태부터 봐야 합니다.
+
+```
+HTTP/1.1 401 Unauthorized
+Content-Type: application/json;charset=utf-8
+
+{"error":"Unauthorized","message":"유효하지 않은 서비스키입니다: 등록되지 않은 서비스키","status":401}
+```
+
+### 9-2. 서울 대중교통환승경로 15000414
+
+[§3](#3-경로-탐색을-직접-구현한-이유) 의 정정입니다. 활용가이드(2021-11-16)를 기준으로 적습니다.
+
+| 항목 | 값 |
+|---|---|
+| 주소 | `http://ws.bus.go.kr/api/rest/pathinfo/getPathInfoByBusNSub` (버스·지하철). 같은 경로에 `getPathInfoByBus`·`getPathInfoBySubway`·`getLocationInfo`(명칭 → 좌표) |
+| 요청 | `startX`·`startY`·`endX`·`endY` (**WGS84**, x 가 경도), `resultType` (`xml`·`json`) |
+| 한도 | 개발 1,000건, 개발·운영 모두 자동승인, 초당 30건 |
+| 이용 조건 | 공공누리 1유형. 단 같은 서버라 9-1 의 "상업적 이용 불가" 문구가 함께 걸립니다 |
+| 응답 | `itemList[]`(경로) 마다 `distance`·`time`(분)·`pathList[]`(구간). 구간은 `routeId`·`routeNm`, 탑승 `fid`·`fname`·`fx`·`fy`, 하차 `tid`·`tname`·`tx`·`ty`. 지하철 구간은 `railLinkList` 가 붙습니다 |
+| 오류 코드 | 0 정상, 1 시스템 오류, 2 잘못된 쿼리, 3 정류소 없음, **4 노선 없음**, 5 잘못된 위치, 6 실시간 정보 없음, **7 경로 없음**, 8 운행 종료 |
+
+- **`headerCd` 의 뜻이 서비스마다 다릅니다.** §8 표에서 `4` 는 "결과 없음"이고 `7` 은 키 사용중지인데,
+  이 서비스에서는 `4` 가 노선 없음, `7` 이 경로 없음입니다. 서울 응답 봉투 하나로 묶을 때
+  코드 해석은 서비스별로 둡니다.
+- **진행 방향 검증에 쓸 값이 있습니다.** 활용가이드 예시에서 버스 구간의 `fid`·`tid` 는 9자리
+  정류소 ID(`115000542`)라 `getStaionByRoute` 의 `station`·`seq` 와 맞춰 볼 수 있어 보입니다.
+  지하철 구간의 `fid` 는 역 코드(`02330`)입니다.
+- **경기·인천을 포함하는지는 문서에 없습니다.** 활용가이드에 범위 언급이 없고 data.go.kr 의
+  공간범위도 비어 있습니다. 실호출로 확인합니다.
+
+### 9-3. 심평원 병원·약국
+
+| 확인 | 결과 | 근거 |
+|---|---|---|
+| 기관코드 | `B551182` 맞습니다 | 실측(경로) |
+| 병원 | `B551182/hospInfoServicev2/getHospBasisList` 있음 | 실측(경로) · Swagger |
+| 약국 | `B551182/pharmacyInfoService/getParmacyBasisList` 있음. **`Parmacy` 오타가 스펙입니다.** `getPharmacyBasisList` 는 `NO_OPENAPI_SERVICE_ERROR` | 실측(경로) |
+| 활용가이드의 낡은 주소 | 병원 가이드(2021-06)의 예시 `hospInfoService1/getHospBasisList1` 은 **폐기**되어 `NO_OPENAPI_SERVICE_ERROR` 입니다. 가이드 예시를 그대로 옮기면 안 됩니다 | 실측(경로) |
+| 요청 변수 | `yadmNm`(UTF-8), `xPos`·`yPos`(WGS84), `radius`(m), `sidoCd`·`sgguCd`·`emdongNm`·`clCd`·`dgsbjtCd`·`zipCd`. 약국은 `clCd`·`dgsbjtCd`·`zipCd` 없음 | Swagger · 가이드 |
+| 응답 | `yadmNm`·`addr`·`telno`·`clCdNm`·`distance`·좌표. 좌표 필드 이름이 병원 `XPos`·`YPos`, 약국 `xPos`·`yPos` 로 대소문자가 다릅니다(가이드 기준) | 가이드 |
+| JSON | 공식 포맷은 XML 이고 Swagger 의 `produces` 도 XML 뿐입니다. 병원 가이드에 "`&_type=json` 을 추가"가 있습니다. 키 오류 응답은 `_type=json` 이면 JSON 으로 옵니다 | 공식 · 실측(오류만) |
+| 한도·조건 | 개발 10,000건, 공공누리 1유형 | 공식 |
+
+### 9-4. 그 밖의 경로
+
+| 대상 | 결과 | 근거 |
+|---|---|---|
+| 서울교통공사 편의시설 15143841 | `B553766/facility/getFcElvtr` 있음(에스컬레이터 `getFcEsctr` 등 14개 연산). 결과 형식은 `_type` 이 아니라 **`dataType=JSON`**. 요청 `lineNm`·`stnCd`·`stnNm`·`vcntEntrcNo`·`oprtngSitu`, 응답에 가동현황 `oprtngSitu`·근접 출입구 `vcntEntrcNo`·층 정보. 이용허락범위 제한 없음 | 실측(경로) · Swagger |
+| 서울교통공사 빠른하차 15143840 | `B553766/inout/getFstExit` 있음. `dataType=JSON`, `lineNm`·`stnCd`·`stnNm` | 실측(경로) · Swagger |
+| 경기 GBIS v2 | `6410000/busarrivalservice/v2/getBusArrivalListv2`·`getBusArrivalItemv2`, `busstationservice/v2/getBusStationAroundListv2` 등 있음. 도착 응답에 분 단위 `predictTime1/2` 와 **초 단위 `predictTimeSec1/2`**, 저상 `lowPlate1/2` | 실측(경로) · Swagger |
+| TAGO 도시코드 | `1613000/BusSttnInfoInqireService/getCtyCodeList` 있음. 인천 값은 키가 있어야 봅니다 | 실측(경로) |
+| 카카오 대중교통 | `GET https://dapi.kakao.com/v2/routing/publictraffic`, 헤더 `Authorization: KakaoAK {REST 키}`, `start_x`·`start_y`·`end_x`·`end_y` | 공식(개발자 문서) |
+
+`PublicDataInterceptor` 는 모든 게이트웨이 요청에 `_type=json` 을 붙이는데, 서울교통공사는
+`dataType`, GBIS 는 `format` 을 씁니다. 이 둘을 붙일 때는 인터셉터가 붙이는 값과 별개로 각 API 의
+형식 변수를 따로 넘겨야 합니다.
