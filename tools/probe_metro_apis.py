@@ -454,7 +454,8 @@ def check_tago_city(ctx: Ctx, res: Result) -> None:
     for i in metro:
         res.add(f"cityCode={i.get('citycode')} {i.get('cityname')}")
     incheon = [i for i in items if "인천" in str(i.get("cityname"))]
-    res.verdict = (f"인천 cityCode={incheon[0].get('citycode')}" if incheon else "인천 없음") + f" (전체 {total}개)"
+    # getCtyCodeList 는 totalCount 를 주지 않는다(2026-10-14 실측)
+    res.verdict = (f"인천 cityCode={incheon[0].get('citycode')}" if incheon else "인천 없음") + f" (전체 {len(items)}개)"
 
 
 def check_gbis_vs_tago(ctx: Ctx, res: Result) -> None:
@@ -472,16 +473,18 @@ def check_gbis_vs_tago(ctx: Ctx, res: Result) -> None:
     res.add(f"정류소 {stop.get('nodenm')} TAGO nodeid={node_id} cityCode={city} → GBIS stationId={station_id}")
 
     diffs: list[int] = []
+    stop_lags: list[int] = []
     for n in range(ctx.rounds):
         tago = gw(ctx, "1613000/ArvlInfoInqireService/getSttnAcctoArvlPrearngeInfoList", f"tago_arr_{n}",
                   cityCode=city, nodeId=node_id, numOfRows=50, pageNo=1, _type="json")
         gbis = gw(ctx, "6410000/busarrivalservice/v2/getBusArrivalListv2", f"gbis_arr_{n}",
                   stationId=station_id, format="json")
         _, t_items, _ = gw_items(tago.json()) if tago.is_json else ("", [], None)
-        t_by_route: dict[str, int] = {}
-        for i in t_items:   # 같은 노선이 두 대 오면 먼저 오는 쪽
+        t_by_route: dict[str, tuple[int, int]] = {}   # 노선 → (초, 남은 정거장). 두 대면 먼저 오는 쪽
+        for i in t_items:
             key, sec = str(i.get("routeno")), int(i.get("arrtime") or 0)
-            t_by_route[key] = min(sec, t_by_route.get(key, sec))
+            if key not in t_by_route or sec < t_by_route[key][0]:
+                t_by_route[key] = (sec, int(i.get("arrprevstationcnt") or 0))
         g_list: list[dict] = []
         if gbis.is_json:
             body = (gbis.json().get("response") or {}).get("msgBody") or {}
@@ -495,16 +498,23 @@ def check_gbis_vs_tago(ctx: Ctx, res: Result) -> None:
             route = str(g.get("routeName"))
             sec = g.get("predictTimeSec1")
             if route in t_by_route and sec not in (None, ""):
-                d = t_by_route[route] - int(sec)
+                t_sec, t_stops = t_by_route[route]
+                d, lag = t_sec - int(sec), t_stops - int(g.get("locationNo1") or 0)
+                # 한쪽에만 있는 차량을 짝지으면 수십 분 차이가 난다(2026-10-14 실측 −1988초). 따로 센다
+                if abs(lag) > 5:
+                    row.append(f"{route}:다른 차량({t_stops}·{g.get('locationNo1')}정거장)")
+                    continue
                 diffs.append(d)
-                row.append(f"{route}:TAGO−GBIS={d:+d}초")
-        res.add(f"{n + 1}회차: TAGO {len(t_by_route)}노선, GBIS {len(g_list)}노선, 공통 {len(row)} → {' '.join(row[:8])}")
+                stop_lags.append(lag)
+                row.append(f"{route}:{d:+d}초/{lag:+d}정거장")
+        res.add(f"{n + 1}회차 (TAGO−GBIS): TAGO {len(t_by_route)}노선, GBIS {len(g_list)}노선 → {' '.join(row[:8])}")
         if n + 1 < ctx.rounds:
             time.sleep(ctx.interval)
     if diffs:
         diffs.sort()
-        res.verdict = (f"TAGO−GBIS 중앙값 {diffs[len(diffs) // 2]:+d}초, 범위 {diffs[0]:+d}~{diffs[-1]:+d}초 "
-                       f"({len(diffs)}쌍)")
+        stop_lags.sort()
+        res.verdict = (f"TAGO−GBIS 중앙값 {diffs[len(diffs) // 2]:+d}초·{stop_lags[len(stop_lags) // 2]:+d}정거장, "
+                       f"범위 {diffs[0]:+d}~{diffs[-1]:+d}초 ({len(diffs)}쌍)")
     else:
         res.verdict = "비교할 쌍이 없음 — 원본 파일 확인"
 
