@@ -41,7 +41,8 @@ jobs:
         env:
           # Settings > Secrets and variables > Actions 에 등록한 값.
           # 없으면 빈 문자열로 빌드되고, 앱은 실행 시 "인증키 없음" 을 화면에 알린다.
-          PUBLIC_DATA_SERVICE_KEY: ${{ secrets.PUBLIC_DATA_SERVICE_KEY }}
+          # 저장소 시크릿을 DATA_GO_KR_SERVICE_KEY 로 옮기는 동안 옛 이름도 받는다.
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY || secrets.PUBLIC_DATA_SERVICE_KEY }}
           JUSO_CONFIRM_KEY: ${{ secrets.JUSO_CONFIRM_KEY }}
           SEOUL_OPEN_API_KEY: ${{ secrets.SEOUL_OPEN_API_KEY }}
         run: ./gradlew assembleDebug --stacktrace

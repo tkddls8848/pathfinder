@@ -137,7 +137,7 @@ fun SettingsScreen(
                         "정상 연결되었습니다."
                     } else {
                         "인증키가 설정되지 않아 버스 정보를 불러올 수 없습니다.\n" +
-                            "local.properties 의 PUBLIC_DATA_SERVICE_KEY 를 확인해 주세요."
+                            "local.properties 의 DATA_GO_KR_SERVICE_KEY 를 확인해 주세요."
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (viewModel.isConfigured) EodigaColors.Success else EodigaColors.Danger,

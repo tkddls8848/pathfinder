@@ -22,7 +22,7 @@ class ServiceKeyProvider @Inject constructor() {
     private val encodedMarkers = Regex("%[0-9A-Fa-f]{2}")
 
     /** 항상 디코딩된(raw) 인증키. 비어 있으면 키 미설정 상태. */
-    val serviceKey: String = normalize(BuildConfig.PUBLIC_DATA_SERVICE_KEY)
+    val serviceKey: String = normalize(BuildConfig.DATA_GO_KR_SERVICE_KEY)
 
     val jusoKey: String = BuildConfig.JUSO_CONFIRM_KEY.trim()
 

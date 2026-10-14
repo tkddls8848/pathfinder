@@ -36,7 +36,7 @@ android {
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "PUBLIC_DATA_SERVICE_KEY", "\"${secret("PUBLIC_DATA_SERVICE_KEY")}\"")
+        buildConfigField("String", "DATA_GO_KR_SERVICE_KEY", "\"${secret("DATA_GO_KR_SERVICE_KEY")}\"")
         buildConfigField("String", "JUSO_CONFIRM_KEY", "\"${secret("JUSO_CONFIRM_KEY")}\"")
         resourceConfigurations += listOf("ko")
     }

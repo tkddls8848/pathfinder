@@ -9,7 +9,7 @@
 
 인증키는 환경 변수 → local.properties 순으로 찾는다. 없는 키를 쓰는 확인은 건너뛴다.
 
-  PUBLIC_DATA_SERVICE_KEY   data.go.kr 키. 대부분의 확인 (데이터셋마다 활용신청 필요)
+  DATA_GO_KR_SERVICE_KEY   data.go.kr 키. 대부분의 확인 (데이터셋마다 활용신청 필요)
   KAKAO_REST_API_KEY        카카오 대중교통 경로. 없으면 건너뜀
   GOOGLE_MAPS_API_KEY       Google Routes TRANSIT. 없으면 건너뜀
 
@@ -81,13 +81,13 @@ def read_local_properties() -> dict[str, str]:
 def load_keys() -> dict[str, str]:
     props = read_local_properties()
     keys = {}
-    for name in ("PUBLIC_DATA_SERVICE_KEY", "KAKAO_REST_API_KEY", "GOOGLE_MAPS_API_KEY"):
+    for name in ("DATA_GO_KR_SERVICE_KEY", "KAKAO_REST_API_KEY", "GOOGLE_MAPS_API_KEY"):
         value = os.environ.get(name) or props.get(name, "")
         if value and not value.startswith("여기에"):
             keys[name] = value
     # ServiceKeyProvider 와 같은 정규화: Encoding 키를 넣어도 raw 로 되돌린다.
-    if "PUBLIC_DATA_SERVICE_KEY" in keys and "%" in keys["PUBLIC_DATA_SERVICE_KEY"]:
-        keys["PUBLIC_DATA_SERVICE_KEY"] = urllib.parse.unquote(keys["PUBLIC_DATA_SERVICE_KEY"])
+    if "DATA_GO_KR_SERVICE_KEY" in keys and "%" in keys["DATA_GO_KR_SERVICE_KEY"]:
+        keys["DATA_GO_KR_SERVICE_KEY"] = urllib.parse.unquote(keys["DATA_GO_KR_SERVICE_KEY"])
     return keys
 
 
@@ -232,7 +232,7 @@ class Ctx:
 
     @property
     def data_key(self) -> str:
-        return self.keys["PUBLIC_DATA_SERVICE_KEY"]
+        return self.keys["DATA_GO_KR_SERVICE_KEY"]
 
 
 # ── 확인들 ───────────────────────────────────────────────────
@@ -243,7 +243,7 @@ def check_seoul_https(ctx: Ctx, res: Result) -> None:
         socket.create_connection(("ws.bus.go.kr", 443), timeout=8).close()
         res.verdict = "443 열림 — https 로 getStationByPos 를 불러 볼 차례"
         r = ctx.http.get("https://ws.bus.go.kr/api/rest/stationinfo/getStationByPos",
-                         {"serviceKey": ctx.keys.get("PUBLIC_DATA_SERVICE_KEY", "x"),
+                         {"serviceKey": ctx.keys.get("DATA_GO_KR_SERVICE_KEY", "x"),
                           "tmX": SEOUL_CITY_HALL[1], "tmY": SEOUL_CITY_HALL[0], "radius": 300},
                          label="seoul_https")
         res.add(f"https 응답 HTTP {r.status}")
@@ -529,16 +529,16 @@ class Check:
 
 CHECKS = [
     Check("seoul-https", "ws.bus.go.kr 이 https 를 받는가", (), check_seoul_https),
-    Check("seoul-json", "서울 4종 resultType=json", ("PUBLIC_DATA_SERVICE_KEY",), check_seoul_json),
-    Check("pathinfo", "15000414 의 응답·범위", ("PUBLIC_DATA_SERVICE_KEY",), check_pathinfo),
+    Check("seoul-json", "서울 4종 resultType=json", ("DATA_GO_KR_SERVICE_KEY",), check_seoul_json),
+    Check("pathinfo", "15000414 의 응답·범위", ("DATA_GO_KR_SERVICE_KEY",), check_pathinfo),
     Check("kakao-transit", "카카오 대중교통 경로", ("KAKAO_REST_API_KEY",), check_kakao_transit),
     Check("google-transit", "Google Routes TRANSIT 이 한국에서 나오는가", ("GOOGLE_MAPS_API_KEY",),
           check_google_transit),
-    Check("hira", "심평원 yadmNm + 반경 검색", ("PUBLIC_DATA_SERVICE_KEY",), check_hira),
-    Check("nmc-encoding", "국립중앙의료원 0건의 원인", ("PUBLIC_DATA_SERVICE_KEY",), check_nmc_encoding),
-    Check("tago-city", "인천 cityCode", ("PUBLIC_DATA_SERVICE_KEY",), check_tago_city),
-    Check("gbis-vs-tago", "경기 TAGO 와 GBIS 의 도착시각", ("PUBLIC_DATA_SERVICE_KEY",), check_gbis_vs_tago),
-    Check("seoul-outside", "서울 API 가 경기 쪽 정류소를 주는가", ("PUBLIC_DATA_SERVICE_KEY",), check_seoul_outside),
+    Check("hira", "심평원 yadmNm + 반경 검색", ("DATA_GO_KR_SERVICE_KEY",), check_hira),
+    Check("nmc-encoding", "국립중앙의료원 0건의 원인", ("DATA_GO_KR_SERVICE_KEY",), check_nmc_encoding),
+    Check("tago-city", "인천 cityCode", ("DATA_GO_KR_SERVICE_KEY",), check_tago_city),
+    Check("gbis-vs-tago", "경기 TAGO 와 GBIS 의 도착시각", ("DATA_GO_KR_SERVICE_KEY",), check_gbis_vs_tago),
+    Check("seoul-outside", "서울 API 가 경기 쪽 정류소를 주는가", ("DATA_GO_KR_SERVICE_KEY",), check_seoul_outside),
 ]
 
 

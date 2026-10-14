@@ -85,7 +85,7 @@ cp local.properties.example local.properties
 
 ```properties
 sdk.dir=/path/to/Android/sdk
-PUBLIC_DATA_SERVICE_KEY=발급받은_디코딩_인증키
+DATA_GO_KR_SERVICE_KEY=발급받은_디코딩_인증키
 JUSO_CONFIRM_KEY=주소검색_승인키   # 선택
 ```
 
@@ -106,7 +106,7 @@ JUSO_CONFIRM_KEY=주소검색_승인키   # 선택
 **요구사항**: JDK 17, Android SDK 35, minSdk 26 (Android 8.0)
 
 > **PC 가 없다면** — 저장소 Settings → Secrets and variables → Actions 에
-> `PUBLIC_DATA_SERVICE_KEY` 를 등록한 뒤, Actions 탭의 "디버그 APK 빌드" 를
+> `DATA_GO_KR_SERVICE_KEY` 를 등록한 뒤, Actions 탭의 "디버그 APK 빌드" 를
 > 실행하면 GitHub 이 대신 빌드해 APK 를 Artifacts 로 올려줍니다.
 > 폰에서 받아 설치할 수 있습니다 — 설치 시 "출처를 알 수 없는 앱" 허용이 필요합니다.
 > 키가 APK 안에 들어가므로 개인용으로만 쓰고 남에게 돌리지 마세요.

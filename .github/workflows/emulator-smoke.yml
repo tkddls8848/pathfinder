@@ -40,7 +40,8 @@ jobs:
 
       - name: 디버그 APK 빌드
         env:
-          PUBLIC_DATA_SERVICE_KEY: ${{ secrets.PUBLIC_DATA_SERVICE_KEY }}
+          # 저장소 시크릿을 DATA_GO_KR_SERVICE_KEY 로 옮기는 동안 옛 이름도 받는다.
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY || secrets.PUBLIC_DATA_SERVICE_KEY }}
           JUSO_CONFIRM_KEY: ${{ secrets.JUSO_CONFIRM_KEY }}
           SEOUL_OPEN_API_KEY: ${{ secrets.SEOUL_OPEN_API_KEY }}
         run: ./gradlew --console=plain assembleDebug

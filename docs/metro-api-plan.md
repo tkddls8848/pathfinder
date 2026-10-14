@@ -151,7 +151,7 @@ TAGO 는 0~3정거장 뒤에 있다고 봅니다([`public-data-apis.md`](public-
 
 사람이 키를 넣고 한 번씩 부릅니다. 결과는 [`public-data-apis.md`](public-data-apis.md)에 적습니다.
 키가 필요한 확인은 `tools/probe_metro_apis.py` 하나로 묶었습니다. 키는 환경 변수나 `local.properties` 의
-`PUBLIC_DATA_SERVICE_KEY`(필수), `KAKAO_REST_API_KEY`·`GOOGLE_MAPS_API_KEY`(없으면 그 확인만 건너뜀)에서
+`DATA_GO_KR_SERVICE_KEY`(필수), `KAKAO_REST_API_KEY`·`GOOGLE_MAPS_API_KEY`(없으면 그 확인만 건너뜀)에서
 읽고, 화면과 원본 응답 파일(`build/metro-probe/`)에서 키를 지웁니다. 아래 표의 「스크립트」 열이
 `--only` 에 넣을 이름입니다. data.go.kr 활용신청은 데이터셋마다 따로 해야 합니다(서울 4종·15000414·
 심평원 2종·GBIS 도착·TAGO 4종).

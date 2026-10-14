@@ -32,7 +32,7 @@
 
 ```properties
 # local.properties
-PUBLIC_DATA_SERVICE_KEY=<일반 인증키(Decoding)>
+DATA_GO_KR_SERVICE_KEY=<일반 인증키(Decoding)>
 JUSO_CONFIRM_KEY=<도로명주소 승인키>
 ```
 
