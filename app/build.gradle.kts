@@ -81,6 +81,8 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // Robolectric 이 화면 테스트에서 실제 리소스·매니페스트를 읽게 한다.
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -118,4 +120,9 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
+
+    // 안내 화면을 기기 없이 JVM 에서 그려 본다 (./gradlew test).
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
